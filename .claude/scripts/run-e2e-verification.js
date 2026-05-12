@@ -18,7 +18,7 @@ const WEB = path.join(ROOT, 'web');
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const opts = { deferredGlobs: [], fixCycleCount: 0 };
+  const opts = { deferredGlobs: [], fixCycleCount: 0, epicMode: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '--epic') opts.epic = args[++i];
@@ -29,9 +29,135 @@ function parseArgs() {
       opts.deferredGlobs = (args[++i] || '').split(',').filter(Boolean);
     } else if (a === '--fix-cycle-count') {
       opts.fixCycleCount = parseInt(args[++i], 10) || 0;
+    } else if (a === '--epic-mode') {
+      opts.epicMode = true;
     }
   }
   return opts;
+}
+
+/**
+ * Discover every routable story spec file in `web/e2e/` for the given epic.
+ * Returns array of { story, glob, path, classification }.
+ */
+function discoverEpicSpecs(epicNum) {
+  const e2eDir = path.join(WEB, 'e2e');
+  if (!fs.existsSync(e2eDir)) return [];
+  const pattern = new RegExp(`^epic-${epicNum}-story-(\\d+)-.*\\.spec\\.ts$`);
+  const entries = fs.readdirSync(e2eDir).filter(f => pattern.test(f));
+  return entries.map(file => {
+    const m = file.match(pattern);
+    const storyNum = parseInt(m[1], 10);
+    const fullPath = path.join(e2eDir, file);
+    const content = fs.readFileSync(fullPath, 'utf8');
+    const liveCount = (content.match(/^\s*test(?:\.only)?\(/gm) || []).length;
+    const fixmeCount = (content.match(/^\s*test\.fixme\(/gm) || []).length;
+    let classification;
+    if (liveCount > 0) classification = 'live';
+    else if (fixmeCount > 0) classification = 'fixme';
+    else classification = 'missing';
+    return {
+      story: storyNum,
+      glob: `e2e/${file}`,
+      path: `e2e/${file}`,
+      classification
+    };
+  });
+}
+
+/**
+ * Epic-level verification: run every routable spec for the epic in a single
+ * playwright invocation. Used during EPIC-QA in batched mode.
+ */
+function runEpicMode(opts) {
+  const specs = discoverEpicSpecs(opts.epic);
+  if (specs.length === 0) {
+    emit({ status: 'halt', reason: 'no-specs', summary: `No spec files found for Epic ${opts.epic}.`, targets: [] });
+    return;
+  }
+
+  // Halt if any expected spec is missing (e.g. file exists but no tests at all).
+  const missing = specs.filter(s => s.classification === 'missing');
+  if (missing.length > 0) {
+    emit({
+      status: 'halt',
+      reason: 'missing-spec',
+      summary: `Epic ${opts.epic}: ${missing.length} spec file(s) have no tests.`,
+      targets: specs
+    });
+    return;
+  }
+
+  const liveSpecs = specs.filter(s => s.classification === 'live');
+  if (liveSpecs.length === 0) {
+    emit({
+      status: 'auto-skipped:fixme',
+      summary: `Epic ${opts.epic}: all specs are test.fixme() — nothing to run.`,
+      targets: specs
+    });
+    return;
+  }
+
+  const livePaths = liveSpecs.map(s => s.path);
+  const playwright = spawnSync(
+    'npx',
+    ['playwright', 'test', ...livePaths, '--reporter=json'],
+    { cwd: WEB, encoding: 'utf8', shell: true, timeout: 1200000, maxBuffer: 100 * 1024 * 1024 }
+  );
+
+  const stdout = playwright.stdout || '';
+  const stderr = playwright.stderr || '';
+  const exitCode = playwright.status;
+
+  let report = null;
+  try { report = JSON.parse(stdout); } catch { /* report stays null */ }
+
+  if (!report) {
+    emit({
+      status: 'failed',
+      failureCount: 1,
+      failures: [{
+        title: 'Playwright run did not produce parseable JSON',
+        error: (stderr || stdout || 'Unknown error').slice(0, 1500),
+        filePath: '',
+        tracePath: ''
+      }],
+      tracesDir: 'web/test-results/',
+      summary: 'Playwright epic-level run failed before producing results.',
+      exitCode
+    });
+    return;
+  }
+
+  const { passCount, specCount, failures } = collectResults(report);
+
+  if (exitCode === 0) {
+    emit({
+      status: 'passed',
+      passCount,
+      specCount,
+      stories: liveSpecs.map(s => s.story),
+      summary: `Epic ${opts.epic}: all ${passCount} tests passed across ${specCount} specs (stories ${liveSpecs.map(s => s.story).join(', ')}).`
+    });
+  } else {
+    // Group failures by story so the orchestrator can scope fix cycles per-story.
+    const failuresByStory = {};
+    for (const f of failures) {
+      const m = (f.filePath || '').match(/epic-\d+-story-(\d+)-/);
+      const sNum = m ? parseInt(m[1], 10) : null;
+      const key = sNum || 'unknown';
+      if (!failuresByStory[key]) failuresByStory[key] = [];
+      failuresByStory[key].push(f);
+    }
+    emit({
+      status: 'failed',
+      failureCount: failures.length,
+      failures,
+      failuresByStory,
+      tracesDir: 'web/test-results/',
+      summary: `Epic ${opts.epic}: ${failures.length} of ${specCount} tests failed.`
+    });
+  }
 }
 
 function persistAndRefresh(opts, status, passCount, failureCount) {
@@ -119,6 +245,16 @@ function collectResults(report) {
 
 function main() {
   const opts = parseArgs();
+
+  // Epic-level verification (batched EPIC-QA): run every story spec at once.
+  if (opts.epicMode) {
+    if (!opts.epic) {
+      emit({ status: 'error', summary: '--epic-mode requires --epic <N>' });
+      process.exit(1);
+    }
+    runEpicMode(opts);
+    return;
+  }
 
   if (!opts.currentGlob) {
     emit({ status: 'error', summary: '--current-glob is required' });

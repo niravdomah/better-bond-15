@@ -37,12 +37,25 @@ For each epic:
   feature-planner (STORIES) → Define stories for THIS epic → user approves
 ```
 
-**Stage 3: Per-story iteration (REALIGN → TEST-DESIGN → WRITE-TESTS → IMPLEMENT → QA)**
+**Stage 3: Per-epic iteration — batched by phase (default) or per-story (legacy)**
+
+**Batched epic mode (default for new epics):** all stories advance one phase at a time as a "pass". The single epic-level QA collapses per-story manual verification and produces ONE commit at the end of the epic.
+```
+For each epic:
+  REALIGN pass (story 1 → 2 → 3)  → TEST-DESIGN pass (story 1 → 2 → 3)
+    → WRITE-TESTS pass (story 1 → 2 → 3)
+    → IMPLEMENT pass (story 1 → 2 → 3, strict order — story N reads N-1's code)
+    → EPIC-QA (single E2E + manual verification + commit covering all stories)
+```
+See [orchestrator-rules.md § Batched Epic-Level Flow](../shared/orchestrator-rules.md#batched-epic-level-flow) for the pass-by-pass execution model.
+
+**Legacy per-story mode:** each story runs through every phase end-to-end before the next story begins.
 ```
 For each story in the epic:
   feature-planner → test-designer → test-generator → developer → code-reviewer → commit & push
       REALIGN        TEST-DESIGN     WRITE-TESTS     IMPLEMENT      QA
 ```
+Opt back into per-story via `node .claude/scripts/transition-phase.js --downgrade-epic-to-story <N>`.
 
 **REALIGN:** Reviews any discovered impacts from previous stories and revises the upcoming story. Auto-completes if no impacts exist.
 **TEST-DESIGN:** Produces a BA-reviewable specification-by-example document before tests are written. Surfaces missing business decisions.

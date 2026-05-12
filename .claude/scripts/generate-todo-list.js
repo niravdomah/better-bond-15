@@ -444,8 +444,16 @@ function buildTodoList(state) {
 
     // EXPANDED: current epic
     // --- STORIES phase item for this epic ---
-    const storiesPhaseComplete = epicState && epicState.phase !== 'STORIES' &&
-      getTotalStories(epicState, e) > 0;
+    // In batched epic mode, STORIES is definitionally complete (the upgrade
+    // requires story files to exist). In legacy mode, the epic's parent phase
+    // field still says "STORIES" while individual stories iterate, so a
+    // secondary signal is needed: any non-PENDING story phase means STORIES
+    // is done.
+    const inBatchedMode = helpers.isBatchedEpic(state) && isCurrentEpic;
+    const hasStartedStories = epicState?.stories && Object.values(epicState.stories)
+      .some(s => s.phase && s.phase !== 'PENDING');
+    const storiesPhaseComplete = (epicState && epicState.phase !== 'STORIES' &&
+      getTotalStories(epicState, e) > 0) || inBatchedMode || hasStartedStories;
     const isStoriesActive = state.currentPhase === 'STORIES' && isCurrentEpic;
     const totalStories = getTotalStories(epicState, e);
     const storiesSuffix = storiesPhaseComplete && totalStories > 0 ?
@@ -460,6 +468,53 @@ function buildTodoList(state) {
 
     // If still in STORIES phase for this epic, don't show story items yet
     if (isStoriesActive || (!storiesPhaseComplete && !isStoriesActive)) {
+      continue;
+    }
+
+    // --- BATCHED EPIC MODE: render pass-based progress ---
+    // In batched mode, all stories advance pass-by-pass instead of each story
+    // running through every phase. Emit a sub-item per pass showing how far
+    // through the pass we are.
+    if (helpers.isBatchedEpic(state) && isCurrentEpic) {
+      const ep = state.epicPass;
+      const passList = helpers.EPIC_PASS_ORDER; // REALIGN, TEST-DESIGN, ..., EPIC-QA
+      const currentPassIdx = passList.indexOf(ep.phase);
+      const PASS_LABELS = {
+        'REALIGN': 'Review impacts (REALIGN pass — all stories)',
+        'TEST-DESIGN': 'Design test scenarios (TEST-DESIGN pass — all stories)',
+        'WRITE-TESTS': 'Write failing tests (WRITE-TESTS pass — all stories)',
+        'IMPLEMENT': 'Implement code (IMPLEMENT pass — all stories, in order)',
+        'EPIC-QA': 'Epic-level QA (single verification + single commit)'
+      };
+      const PASS_ACTIVE = {
+        'REALIGN': 'Reviewing impacts across the epic',
+        'TEST-DESIGN': 'Designing test scenarios across the epic',
+        'WRITE-TESTS': 'Writing tests across the epic',
+        'IMPLEMENT': 'Implementing stories in order',
+        'EPIC-QA': 'Running epic-level QA'
+      };
+      for (let pi = 0; pi < passList.length; pi++) {
+        const pass = passList[pi];
+        let status;
+        if (pi < currentPassIdx) {
+          status = 'completed';
+        } else if (pi === currentPassIdx) {
+          status = state.phaseStatus === 'in_progress' ? 'in_progress' : 'pending';
+        } else {
+          status = 'pending';
+        }
+        let suffix = '';
+        if (pi === currentPassIdx) {
+          const progressDone = Object.values(ep.storyPhases).filter(p => p === 'COMPLETE').length;
+          suffix = ` — ${progressDone}/${ep.storyOrder.length} stories done`;
+        }
+        items.push({
+          content: `  ${PASS_LABELS[pass]}${suffix}`,
+          status,
+          activeForm: PASS_ACTIVE[pass]
+        });
+      }
+      // Skip the legacy per-story sub-phase rendering for this epic
       continue;
     }
 

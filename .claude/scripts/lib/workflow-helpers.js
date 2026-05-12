@@ -1389,6 +1389,186 @@ function checkStaleness(pausedAt) {
 }
 
 // =============================================================================
+// BATCHED EPIC-LEVEL FLOW (epicPass)
+// =============================================================================
+//
+// In batched mode (`state.batchMode === "epic"`), all stories in an epic
+// advance one phase at a time as a single "pass" rather than each story
+// running through every phase before the next story begins. The pass order
+// is: REALIGN → TEST-DESIGN → WRITE-TESTS → IMPLEMENT → EPIC-QA → COMPLETE.
+//
+// EPIC-QA is collapsed into a single epic-level QA (one verification, one
+// commit) instead of per-story QA. The per-story phases iterate
+// sequentially within a pass (Story 1 → 2 → 3) because the developer
+// agent reads prior-story code; tests for later stories are written
+// against the test-handoff metadata, not against on-disk code.
+
+const EPIC_PASS_ORDER = ['REALIGN', 'TEST-DESIGN', 'WRITE-TESTS', 'IMPLEMENT', 'EPIC-QA'];
+const EPIC_PASS_STORY_STATES = ['PENDING', 'IN_PROGRESS', 'COMPLETE', 'REWORK'];
+
+/**
+ * Returns true when the workflow is operating in batched epic mode.
+ */
+function isBatchedEpic(state) {
+  return Boolean(state && state.batchMode === 'epic' && state.epicPass);
+}
+
+/**
+ * Read the epicPass substate. Returns null if not present.
+ */
+function readEpicPass(state) {
+  if (!state || !state.epicPass) return null;
+  return state.epicPass;
+}
+
+/**
+ * Write epicPass back onto state. Mutates the passed-in state object.
+ */
+function writeEpicPass(state, epicPass) {
+  if (!state) throw new Error('writeEpicPass: state is required');
+  state.epicPass = epicPass;
+  return state;
+}
+
+/**
+ * Initialise an epicPass block for a fresh REALIGN pass.
+ *
+ * @param {number[]} storyOrder - canonical story numbers in execution order
+ * @param {object} [opts]
+ * @param {number} [opts.firstInProgress] - which story to mark IN_PROGRESS (default: first)
+ * @returns {object} epicPass block ready for state.epicPass
+ */
+function initEpicPass(storyOrder, opts = {}) {
+  if (!Array.isArray(storyOrder) || storyOrder.length === 0) {
+    throw new Error('initEpicPass: storyOrder must be a non-empty array');
+  }
+  const firstInProgress = opts.firstInProgress ?? storyOrder[0];
+  const storyPhases = {};
+  for (const s of storyOrder) {
+    storyPhases[String(s)] = s === firstInProgress ? 'IN_PROGRESS' : 'PENDING';
+  }
+  return {
+    phase: 'REALIGN',
+    storyOrder: [...storyOrder],
+    storyPhases,
+    passStartedAt: new Date().toISOString(),
+    fixCycles: {},
+    qaFindings: {}
+  };
+}
+
+/**
+ * Find the next pending story in the current pass.
+ * Returns the story number or null when every story is COMPLETE.
+ *
+ * If a story is currently IN_PROGRESS, that story is returned (still pending).
+ */
+function nextPendingStoryInPass(state) {
+  const epicPass = readEpicPass(state);
+  if (!epicPass) return null;
+  for (const num of epicPass.storyOrder) {
+    const phase = epicPass.storyPhases[String(num)];
+    if (phase === 'IN_PROGRESS' || phase === 'PENDING' || phase === 'REWORK') {
+      return num;
+    }
+  }
+  return null;
+}
+
+/**
+ * Mark a story as COMPLETE for the current pass and advance to the next
+ * pending story (setting it to IN_PROGRESS). Returns { completedStory, nextStory, allComplete }.
+ * Mutates state.
+ */
+function markStoryCompleteInPass(state, storyNum) {
+  const epicPass = readEpicPass(state);
+  if (!epicPass) throw new Error('markStoryCompleteInPass: no epicPass on state');
+  const key = String(storyNum);
+  if (!(key in epicPass.storyPhases)) {
+    throw new Error(`markStoryCompleteInPass: story ${storyNum} not in storyOrder`);
+  }
+  epicPass.storyPhases[key] = 'COMPLETE';
+
+  // Promote the next PENDING story to IN_PROGRESS
+  let nextStory = null;
+  for (const n of epicPass.storyOrder) {
+    if (epicPass.storyPhases[String(n)] === 'PENDING') {
+      epicPass.storyPhases[String(n)] = 'IN_PROGRESS';
+      nextStory = n;
+      break;
+    }
+  }
+
+  const allComplete = Object.values(epicPass.storyPhases).every(p => p === 'COMPLETE');
+  if (nextStory) state.currentStory = nextStory;
+
+  return { completedStory: storyNum, nextStory, allComplete };
+}
+
+/**
+ * Advance epicPass to the next pass when every story in the current pass is COMPLETE.
+ * Resets storyPhases to PENDING (with the first story IN_PROGRESS) and updates
+ * passStartedAt + state.currentPhase.
+ *
+ * If the current pass is EPIC-QA, the epic itself is marked COMPLETE
+ * — the caller is expected to follow up with per-story COMPLETE transitions
+ * via transition-phase.js.
+ *
+ * Returns { from, to, allEpicComplete }.
+ */
+function advanceEpicPass(state) {
+  const epicPass = readEpicPass(state);
+  if (!epicPass) throw new Error('advanceEpicPass: no epicPass on state');
+
+  const allComplete = Object.values(epicPass.storyPhases).every(p => p === 'COMPLETE');
+  if (!allComplete) {
+    throw new Error('advanceEpicPass: not all stories in the current pass are COMPLETE');
+  }
+
+  const currentIdx = EPIC_PASS_ORDER.indexOf(epicPass.phase);
+  if (currentIdx === -1) {
+    throw new Error(`advanceEpicPass: unknown current pass "${epicPass.phase}"`);
+  }
+
+  const from = epicPass.phase;
+  if (currentIdx === EPIC_PASS_ORDER.length - 1) {
+    // Already on EPIC-QA — caller should drive per-story COMPLETE transitions.
+    return { from, to: null, allEpicComplete: true };
+  }
+
+  const to = EPIC_PASS_ORDER[currentIdx + 1];
+  epicPass.phase = to;
+  epicPass.passStartedAt = new Date().toISOString();
+
+  // Reset storyPhases for the new pass
+  for (const n of epicPass.storyOrder) {
+    epicPass.storyPhases[String(n)] = 'PENDING';
+  }
+  // Mark the first story IN_PROGRESS
+  if (epicPass.storyOrder.length > 0) {
+    epicPass.storyPhases[String(epicPass.storyOrder[0])] = 'IN_PROGRESS';
+    state.currentStory = epicPass.storyOrder[0];
+  }
+  // Reset per-pass fix counters
+  epicPass.fixCycles = {};
+  // EPIC-QA owns qaFindings; reset when entering it
+  if (to === 'EPIC-QA') epicPass.qaFindings = {};
+
+  // Update the canonical currentPhase for legacy tooling
+  state.currentPhase = to === 'EPIC-QA' ? 'QA' : to;
+
+  return { from, to, allEpicComplete: false };
+}
+
+/**
+ * Convenience: read the current pass phase ("REALIGN", "EPIC-QA", etc.) or null.
+ */
+function currentEpicPassPhase(state) {
+  const ep = readEpicPass(state);
+  return ep ? ep.phase : null;
+}
+
+// =============================================================================
 // EXPORTS
 // =============================================================================
 
@@ -1398,6 +1578,8 @@ module.exports = {
   STORY_PHASES,
   ALL_PHASES,
   PHASE_BOUNDARY,
+  EPIC_PASS_ORDER,
+  EPIC_PASS_STORY_STATES,
 
   // Path constants
   STORIES_DIR,
@@ -1475,5 +1657,15 @@ module.exports = {
   parseEpicNumbers,
   getPhases,
   computeGroupStatus,
-  checkStaleness
+  checkStaleness,
+
+  // Batched epic-level flow
+  isBatchedEpic,
+  readEpicPass,
+  writeEpicPass,
+  initEpicPass,
+  nextPendingStoryInPass,
+  markStoryCompleteInPass,
+  advanceEpicPass,
+  currentEpicPassPhase
 };

@@ -189,7 +189,24 @@ function validateTransition(currentPhase, targetPhase, state, epicNum, storyNum)
   }
 
   // Special case: REALIGN/WRITE-TESTS for story 2+ requires previous story to be COMPLETE
+  // In batched epic mode, the prerequisite changes: Story N can enter the current
+  // pass once Story N-1 has finished the SAME pass (epicPass.storyPhases[N-1] === 'COMPLETE'),
+  // not once Story N-1 has finished every phase.
   if (storyNum && storyNum > 1 && ['REALIGN', 'WRITE-TESTS'].includes(targetPhase)) {
+    if (helpers.isBatchedEpic(state)) {
+      const epicPass = state.epicPass;
+      const prevPhase = epicPass.storyPhases[String(storyNum - 1)];
+      // In batched mode the previous story only needs to have COMPLETEd the
+      // current pass — same-pass-next-story transitions are explicitly allowed.
+      if (prevPhase !== 'COMPLETE') {
+        return {
+          valid: false,
+          message: `Cannot start Story ${storyNum} in batched ${epicPass.phase} pass: Story ${storyNum - 1} has not finished this pass (status: ${prevPhase || 'UNKNOWN'})`
+        };
+      }
+      return { valid: true };
+    }
+
     const epicState = state?.epics?.[epicNum];
     const prevStory = epicState?.stories?.[storyNum - 1];
     if (!prevStory || prevStory.phase !== 'COMPLETE') {
@@ -198,6 +215,14 @@ function validateTransition(currentPhase, targetPhase, state, epicNum, storyNum)
         message: `Cannot start Story ${storyNum}: Story ${storyNum - 1} is not COMPLETE`
       };
     }
+    return { valid: true };
+  }
+
+  // Special case: in batched epic mode, the same-pass-next-story transition
+  // for any story phase (REALIGN→REALIGN, TEST-DESIGN→TEST-DESIGN, etc.) is
+  // legal because the previous story has just finished the same pass.
+  if (helpers.isBatchedEpic(state) && from === targetPhase &&
+      helpers.STORY_PHASES.includes(targetPhase)) {
     return { valid: true };
   }
 
@@ -621,6 +646,58 @@ function repairState() {
   if (intakeBlock) repairedState.intake = intakeBlock;
   if (designBlock) repairedState.design = designBlock;
   repairedState.designArtifacts = designArtifactsBlock;
+
+  // Detect batched-mode signals from disk and reconstruct epicPass if needed.
+  // Signal: multiple stories in the current epic share the same in-flight phase
+  // (e.g. all in TEST-DESIGN, all with tests written but not yet implemented).
+  // This is rare in legacy mode — in legacy, only ONE story is in flight at a time.
+  if (repairedState.currentEpic && epicStates[repairedState.currentEpic]) {
+    const epicSt = epicStates[repairedState.currentEpic];
+    const stories = epicSt.stories || {};
+    const phases = Object.values(stories).map(s => s.phase);
+    const distinctNonComplete = [...new Set(phases.filter(p => p && p !== 'COMPLETE'))];
+    // Heuristic: 2+ stories in the same non-COMPLETE phase = batched pass in flight.
+    const phaseCounts = {};
+    for (const p of phases) {
+      if (p && p !== 'COMPLETE') phaseCounts[p] = (phaseCounts[p] || 0) + 1;
+    }
+    const passPhase = Object.entries(phaseCounts).find(([, c]) => c >= 2)?.[0];
+    if (passPhase && helpers.EPIC_PASS_ORDER.includes(passPhase)) {
+      const storyNums = Object.keys(stories).map(Number).sort((a, b) => a - b);
+      const storyPhases = {};
+      for (const n of storyNums) {
+        const sp = stories[n]?.phase;
+        const spIdx = helpers.EPIC_PASS_ORDER.indexOf(sp);
+        const passIdx = helpers.EPIC_PASS_ORDER.indexOf(passPhase);
+        if (sp === 'COMPLETE' || (spIdx >= 0 && spIdx > passIdx)) {
+          storyPhases[String(n)] = 'COMPLETE';
+        } else if (sp === passPhase) {
+          // First story at this phase becomes IN_PROGRESS, others remain at this phase
+          storyPhases[String(n)] = 'IN_PROGRESS';
+        } else {
+          storyPhases[String(n)] = 'PENDING';
+        }
+      }
+      // Demote all but the first IN_PROGRESS to PENDING (one at a time within a pass)
+      let seenInProgress = false;
+      for (const n of storyNums) {
+        if (storyPhases[String(n)] === 'IN_PROGRESS') {
+          if (seenInProgress) storyPhases[String(n)] = 'PENDING';
+          seenInProgress = true;
+        }
+      }
+      repairedState.batchMode = 'epic';
+      repairedState.epicPass = {
+        phase: passPhase,
+        storyOrder: storyNums,
+        storyPhases,
+        passStartedAt: new Date().toISOString(),
+        fixCycles: {},
+        qaFindings: {}
+      };
+      detected.push(`Epic ${repairedState.currentEpic}: detected batched ${passPhase} pass (${distinctNonComplete.length} stories in flight)`);
+    }
+  }
 
   writeState(repairedState);
 
@@ -1190,6 +1267,11 @@ Usage:
   node .claude/scripts/transition-phase.js --get-deferred-verification [--epic N | --current]
   node .claude/scripts/transition-phase.js --advance-phase
   node .claude/scripts/transition-phase.js --pause-phase
+  node .claude/scripts/transition-phase.js --upgrade-epic-to-batched <N>
+  node .claude/scripts/transition-phase.js --downgrade-epic-to-story <N>
+  node .claude/scripts/transition-phase.js --complete-story-pass [--story M]
+  node .claude/scripts/transition-phase.js --advance-pass
+  node .claude/scripts/transition-phase.js --record-qa-finding --story M --note "..."
   node .claude/scripts/transition-phase.js --show
   node .claude/scripts/transition-phase.js --repair
 
@@ -1218,6 +1300,11 @@ Options:
   --set-total-stories <N> Legacy alias for --set-totals stories (requires --epic)
   --advance-phase         Move from PHASE-BOUNDARY to STORIES for the next phase's first epic
   --pause-phase           Mark PHASE-BOUNDARY as paused (user picked "Stop here")
+  --upgrade-epic-to-batched <N>  Flip epic N into batched mode (all stories iterate per phase pass)
+  --downgrade-epic-to-story <N>  Revert epic N to legacy per-story mode
+  --complete-story-pass   Mark current story as COMPLETE for the current pass and advance to next pending story
+  --advance-pass          Advance epicPass to the next pass (requires all stories COMPLETE in current pass)
+  --record-qa-finding     Record a QA finding under epicPass.qaFindings[story] during EPIC-QA
   --show                  Display current workflow state
   --repair                Attempt to reconstruct state from artifacts
 
@@ -1665,6 +1752,250 @@ function main() {
         phase: state.currentPhase,
         phaseStatus: state.phaseStatus
       }
+    }, null, 2));
+    return;
+  }
+
+  // ---------------------------------------------------------------------------
+  // BATCHED EPIC-LEVEL FLOW HANDLERS
+  // ---------------------------------------------------------------------------
+
+  // --upgrade-epic-to-batched <N>
+  // One-shot migration: flips an epic into batched mode and initialises its
+  // epicPass block. Preserves any in-flight story state — the currently
+  // in-progress story stays IN_PROGRESS in the new pass, every other story
+  // becomes PENDING. The current pass phase is taken from state.currentPhase
+  // when it is a recognised pass; otherwise defaults to REALIGN.
+  if (args.includes('--upgrade-epic-to-batched')) {
+    const idx = args.indexOf('--upgrade-epic-to-batched');
+    const epicNum = parsePositiveInt(args[idx + 1], 'epic number');
+
+    const state = readState();
+    if (!state) exitWithError('No workflow state found. Run /start first.');
+
+    const epicDir = helpers.findEpicDir(epicNum);
+    if (!epicDir) exitWithError(`Epic ${epicNum} directory not found in generated-docs/stories/`);
+
+    const storyFiles = helpers.findStoryFiles(epicDir);
+    if (storyFiles.length === 0) exitWithError(`Epic ${epicNum} has no story files. Run STORIES first.`);
+    const storyOrder = storyFiles.map(s => s.num);
+
+    // Determine which story is "in progress" right now
+    const stateCurrentStory = state.currentStory && storyOrder.includes(state.currentStory)
+      ? state.currentStory
+      : storyOrder[0];
+
+    // Determine the current pass phase
+    const passCandidate = state.currentPhase;
+    const validPasses = ['REALIGN', 'TEST-DESIGN', 'WRITE-TESTS', 'IMPLEMENT'];
+    const passPhase = validPasses.includes(passCandidate) ? passCandidate : 'REALIGN';
+
+    // Build epicPass with the in-flight story IN_PROGRESS
+    const epicPass = helpers.initEpicPass(storyOrder, { firstInProgress: stateCurrentStory });
+    epicPass.phase = passPhase;
+    // Honour story positions: stories BEFORE the in-flight one are marked
+    // COMPLETE for the current pass (only relevant if the user upgraded
+    // mid-pass — e.g. story 1 done in REALIGN, story 2 in-flight). We
+    // detect "done" via the legacy per-story phase being >= current pass.
+    const passIdx = helpers.EPIC_PASS_ORDER.indexOf(passPhase);
+    for (const num of storyOrder) {
+      if (num >= stateCurrentStory) continue;
+      const legacy = state.epics?.[epicNum]?.stories?.[num]?.phase;
+      const legacyIdx = helpers.EPIC_PASS_ORDER.indexOf(legacy);
+      if (legacyIdx >= passIdx || legacy === 'COMPLETE') {
+        epicPass.storyPhases[String(num)] = 'COMPLETE';
+      }
+    }
+
+    state.batchMode = 'epic';
+    state.epicPass = epicPass;
+    state.currentEpic = epicNum;
+    state.currentStory = stateCurrentStory;
+    state.currentPhase = passPhase;
+    state.phaseStatus = state.phaseStatus || 'ready';
+
+    if (!state.history) state.history = [];
+    state.history.push({
+      timestamp: new Date().toISOString(),
+      epic: epicNum,
+      story: stateCurrentStory,
+      from: passCandidate,
+      to: passPhase,
+      note: 'Upgraded to batched epic mode'
+    });
+
+    writeState(state);
+    console.log(JSON.stringify({
+      status: 'ok',
+      message: `Epic ${epicNum} upgraded to batched mode. Current pass: ${passPhase}.`,
+      epicPass,
+      state: {
+        epic: state.currentEpic,
+        story: state.currentStory,
+        phase: state.currentPhase,
+        batchMode: state.batchMode
+      }
+    }, null, 2));
+    return;
+  }
+
+  // --downgrade-epic-to-story <N>
+  // Reverse of upgrade: removes batchMode + epicPass, leaves currentPhase /
+  // currentStory intact. Used for rollback if batched mode misbehaves.
+  if (args.includes('--downgrade-epic-to-story')) {
+    const idx = args.indexOf('--downgrade-epic-to-story');
+    const epicNum = parsePositiveInt(args[idx + 1], 'epic number');
+
+    const state = readState();
+    if (!state) exitWithError('No workflow state found.');
+    if (!helpers.isBatchedEpic(state)) exitWithError('Workflow is not in batched mode — nothing to downgrade.');
+    if (state.currentEpic !== epicNum) exitWithError(`Cannot downgrade Epic ${epicNum}: currentEpic is ${state.currentEpic}.`);
+
+    delete state.batchMode;
+    delete state.epicPass;
+    if (!state.history) state.history = [];
+    state.history.push({
+      timestamp: new Date().toISOString(),
+      epic: epicNum,
+      story: state.currentStory,
+      from: state.currentPhase,
+      to: state.currentPhase,
+      note: 'Downgraded from batched epic mode'
+    });
+
+    writeState(state);
+    console.log(JSON.stringify({
+      status: 'ok',
+      message: `Epic ${epicNum} downgraded to legacy per-story mode.`,
+      state: {
+        epic: state.currentEpic,
+        story: state.currentStory,
+        phase: state.currentPhase,
+        batchMode: state.batchMode || 'story'
+      }
+    }, null, 2));
+    return;
+  }
+
+  // --complete-story-pass [--story M]
+  // Marks the current story (or --story M) as COMPLETE for the current pass
+  // and advances epicPass to the next pending story. If all stories are now
+  // COMPLETE, no auto-advance happens — the caller must run --advance-pass.
+  if (args.includes('--complete-story-pass')) {
+    const state = readState();
+    if (!state) exitWithError('No workflow state found.');
+    if (!helpers.isBatchedEpic(state)) exitWithError('--complete-story-pass requires batched epic mode.');
+
+    const storyIdx = args.indexOf('--story');
+    const storyNum = storyIdx !== -1 ? parsePositiveInt(args[storyIdx + 1], 'story number') : state.currentStory;
+    if (!storyNum) exitWithError('--complete-story-pass requires --story M or a current story in state.');
+
+    const result = helpers.markStoryCompleteInPass(state, storyNum);
+    if (result.nextStory) {
+      state.currentStory = result.nextStory;
+    }
+
+    // Mirror onto legacy per-story phase: in batched mode, the per-story phase
+    // field reflects the highest pass that story has completed.
+    const epicNum = state.currentEpic;
+    if (state.epics?.[epicNum]?.stories) {
+      if (!state.epics[epicNum].stories[storyNum]) state.epics[epicNum].stories[storyNum] = {};
+      state.epics[epicNum].stories[storyNum].phase = state.epicPass.phase;
+    }
+
+    if (!state.history) state.history = [];
+    state.history.push({
+      timestamp: new Date().toISOString(),
+      epic: epicNum,
+      story: storyNum,
+      from: state.epicPass.phase,
+      to: state.epicPass.phase,
+      note: `Story ${storyNum} completed ${state.epicPass.phase} pass`
+    });
+
+    writeState(state);
+    console.log(JSON.stringify({
+      status: 'ok',
+      message: result.allComplete
+        ? `Story ${storyNum} completed ${state.epicPass.phase} pass. All stories done — run --advance-pass.`
+        : `Story ${storyNum} completed ${state.epicPass.phase} pass. Next: Story ${result.nextStory}.`,
+      passComplete: result.allComplete,
+      nextStory: result.nextStory,
+      epicPass: state.epicPass
+    }, null, 2));
+    return;
+  }
+
+  // --advance-pass
+  // Move epicPass to the next pass (REALIGN→TEST-DESIGN→...→EPIC-QA). Requires
+  // every story in the current pass to be COMPLETE.
+  if (args.includes('--advance-pass')) {
+    const state = readState();
+    if (!state) exitWithError('No workflow state found.');
+    if (!helpers.isBatchedEpic(state)) exitWithError('--advance-pass requires batched epic mode.');
+
+    let result;
+    try {
+      result = helpers.advanceEpicPass(state);
+    } catch (e) {
+      exitWithError(e.message);
+    }
+
+    if (!state.history) state.history = [];
+    state.history.push({
+      timestamp: new Date().toISOString(),
+      epic: state.currentEpic,
+      story: state.currentStory,
+      from: result.from,
+      to: result.to || 'EPIC-COMPLETE',
+      note: result.allEpicComplete
+        ? `Pass ${result.from} complete — epic awaiting per-story COMPLETE transitions`
+        : `Advanced from ${result.from} to ${result.to}`
+    });
+
+    writeState(state);
+    console.log(JSON.stringify({
+      status: 'ok',
+      message: result.allEpicComplete
+        ? `Pass ${result.from} complete. Epic awaiting per-story COMPLETE transitions.`
+        : `Advanced from ${result.from} to ${result.to}.`,
+      from: result.from,
+      to: result.to,
+      allEpicComplete: result.allEpicComplete,
+      epicPass: state.epicPass,
+      state: {
+        epic: state.currentEpic,
+        story: state.currentStory,
+        phase: state.currentPhase
+      }
+    }, null, 2));
+    return;
+  }
+
+  // --record-qa-finding --story M --note "..."
+  // Append a QA finding under epicPass.qaFindings[M] during EPIC-QA. Used by
+  // the orchestrator when the user reports a bug during manual verification.
+  if (args.includes('--record-qa-finding')) {
+    const state = readState();
+    if (!state) exitWithError('No workflow state found.');
+    if (!helpers.isBatchedEpic(state)) exitWithError('--record-qa-finding requires batched epic mode.');
+
+    const storyIdx = args.indexOf('--story');
+    const noteIdx = args.indexOf('--note');
+    const storyNum = storyIdx !== -1 ? parsePositiveInt(args[storyIdx + 1], 'story number') : null;
+    const note = noteIdx !== -1 ? args[noteIdx + 1] : null;
+    if (!storyNum) exitWithError('--record-qa-finding requires --story M.');
+    if (!note) exitWithError('--record-qa-finding requires --note "<text>".');
+
+    if (!state.epicPass.qaFindings) state.epicPass.qaFindings = {};
+    const key = String(storyNum);
+    if (!state.epicPass.qaFindings[key]) state.epicPass.qaFindings[key] = [];
+    state.epicPass.qaFindings[key].push({ timestamp: new Date().toISOString(), note });
+    writeState(state);
+    console.log(JSON.stringify({
+      status: 'ok',
+      message: `Recorded QA finding on Story ${storyNum}.`,
+      qaFindings: state.epicPass.qaFindings
     }, null, 2));
     return;
   }

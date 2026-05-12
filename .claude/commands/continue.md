@@ -81,6 +81,101 @@ Find the phase below matching the current phase in the state JSON, and execute i
 - **NEVER suppress spec drift findings.** When composing the spec-compliance-watchdog prompt, do NOT include instructions to ignore, skip, or excuse any changes — regardless of how or why the drift occurred (including user-approved QA fix-cycle changes). Pass fix-cycle context as informational background only.
 - Follow all rules in orchestrator-rules.md — especially scoped call patterns, voice guidelines, commit policy, and the FRS-Over-Template Rule.
 
+### Batched Epic Mode Dispatch (check FIRST)
+
+**Before dispatching to a per-story phase, check whether the workflow is in batched epic mode.**
+
+If the state JSON has `workflow.batchMode === "epic"` and `epicPass` is present:
+
+- The current pass is `state.epicPass.phase` (one of: `REALIGN`, `TEST-DESIGN`, `WRITE-TESTS`, `IMPLEMENT`, `EPIC-QA`).
+- The story currently IN_PROGRESS within the pass is `state.currentStory` (mirrored in `epicPass.storyPhases[currentStory]`).
+- **Dispatch to the matching `### Phase: EPIC-<PASS>` section below**, NOT the per-story phase sections.
+- The legacy per-story sections (`### Phase: REALIGN`, etc.) only apply when `batchMode === "story"` (the legacy default).
+
+**Pass progression invariants:**
+
+- Stories within a pass run sequentially (Story 1 → Story 2 → Story 3). When a story completes the current pass, run `--complete-story-pass --story M` to mark it COMPLETE and promote the next pending story to IN_PROGRESS.
+- When every story has completed the pass, run `--advance-pass` to flip to the next pass (resets all `storyPhases` to PENDING, marks story 1 IN_PROGRESS, updates `epicPass.phase`).
+- Do NOT call `transition-phase.js --to <PHASE>` for individual story phase transitions while in batched mode. Use `--complete-story-pass` and `--advance-pass` instead.
+
+### Phase: EPIC-REALIGN
+
+Current epic: state.currentEpic. Current story (in flight): state.currentStory.
+
+For the in-flight story (and each subsequent PENDING story afterwards within this pass):
+
+1. Run the realign agent's Call A autonomously for the story (use the existing per-story REALIGN prompt — see [orchestrator-rules.md § REALIGN](../shared/orchestrator-rules.md#realign-1-2-scoped-calls)).
+2. If Call A reports `impactsFound: false` → mark `--complete-story-pass --story M` immediately (auto-complete, no user prompt). Move to the next PENDING story.
+3. If Call A reports impacts → COLLECT them but do NOT prompt yet. Continue running Call A for the remaining PENDING stories in the pass.
+4. **After all stories in the pass have run Call A**, present a single batched `AskUserQuestion` (up to 4 questions, grouped by story) covering every story that had impacts. On approval, run Call B per story to apply changes. Mark each story COMPLETE via `--complete-story-pass --story M`.
+5. When all `storyPhases` are COMPLETE, run `node .claude/scripts/transition-phase.js --advance-pass` to advance to EPIC-TEST-DESIGN.
+
+Fire dashboard update at end of pass.
+
+### Phase: EPIC-TEST-DESIGN
+
+Current epic: state.currentEpic.
+
+For each PENDING/IN_PROGRESS story in `epicPass.storyOrder`:
+
+1. Launch the **test-designer** agent Call A for the story (use the existing prompt from [orchestrator-rules.md § TEST-DESIGN](../shared/orchestrator-rules.md#test-design-2-scoped-calls--ba-decision-persistence)).
+2. After Call A returns, run `node .claude/scripts/list-ba-decisions.js --epic <N> --story <M>` to enumerate BA decisions. **Buffer** the decisions in memory keyed by story — do NOT prompt the user yet.
+
+**After all stories have produced test-design docs**, present BA decisions in batched `AskUserQuestion` calls — grouped by story, **max 3 decisions per call**. Continue across multiple `AskUserQuestion` rounds until every decision is resolved. Persist each decision via `resolve-ba-decision.js`.
+
+**Then**, for each story, run test-designer Call B (rewrite test-design doc with resolved decisions and emit `renderScope` field in the test-handoff). Call `--complete-story-pass --story M` after each Call B succeeds.
+
+When all `storyPhases` are COMPLETE, run `--advance-pass` to advance to EPIC-WRITE-TESTS. Fire dashboard update.
+
+### Phase: EPIC-WRITE-TESTS
+
+For each PENDING/IN_PROGRESS story in `epicPass.storyOrder`:
+
+1. Launch the **test-generator** agent for the story (single autonomous call — see [orchestrator-rules.md § WRITE-TESTS](../shared/orchestrator-rules.md#write-tests-single-call--fully-autonomous)).
+2. After it returns, run `--complete-story-pass --story M`.
+
+No user gating in this pass. When all stories are COMPLETE, run `--advance-pass` to advance to EPIC-IMPLEMENT. Fire dashboard update.
+
+### Phase: EPIC-IMPLEMENT
+
+For each PENDING/IN_PROGRESS story in `epicPass.storyOrder` (strict sequential — Story 1 first, then Story 2, ...):
+
+1. Launch the **developer** agent for the story (single autonomous call — see [orchestrator-rules.md § IMPLEMENT](../shared/orchestrator-rules.md#implement-single-call--fully-autonomous)). The agent prompt must include: `"You are story M in the EPIC-IMPLEMENT pass. Stories 1..M-1 in this pass have already implemented — their code is on disk. Read the existing patterns and extend them; do not rebuild what they already produced."`
+2. After it returns, run `--complete-story-pass --story M`.
+
+Strict order is required because Story N's developer agent reads Story N-1's just-completed code. No user gating in this pass. When all stories are COMPLETE, run `--advance-pass` to advance to EPIC-QA. Fire dashboard update.
+
+### Phase: EPIC-QA
+
+This is a single epic-level QA: one E2E verification, one consolidated manual verification, one big commit at the end. Per-story QA Call A may still run individually for spec-compliance scoping, but Call B/C are epic-level.
+
+1. **Per-story Call A (review-mode)**: for each story in `epicPass.storyOrder`, launch the **code-reviewer** agent Call A with story-level scope. Collect findings. Do NOT commit yet.
+
+2. **E2E Verification (Gate 6a, epic-level)**: launch the **playwright-runner** agent with prompt: `"Run epic-level Playwright verification. Command: node .claude/scripts/run-e2e-verification.js --epic-mode --epic <N>. Return the structured JSON result."` Handle the result:
+   - `passed` → continue to manual verification
+   - `failed` → enter QA Fix Cycle (see below)
+   - `halt` → STOP and ask the user how to proceed
+   - `auto-skipped:fixme` / `auto-skipped:non-routable` → continue with caveat
+
+3. **Manual Verification (Gate 6, batched)**: read each story's verification checklist at `generated-docs/qa/epic-N-[slug]/story-M-[slug]-verification-checklist.md`. Display them as ONE consolidated checklist grouped by story, then present a single `AskUserQuestion` with options:
+   - "All stories pass" → continue to commit
+   - "Findings on specific stories" → for each story with findings, run `node .claude/scripts/transition-phase.js --record-qa-finding --story M --note "..."`, then enter QA Fix Cycle
+
+4. **QA Fix Cycle (per-story scoping)**: for each story with findings:
+   - Launch the **developer** agent scoped to the story (prompt includes the finding text + story context).
+   - Re-run that story's Vitest + Playwright spec only.
+   - Increment `epicPass.fixCycles[M]`. If `fixCycles[M] >= 3`, halt and ask the user how to proceed (do not auto-retry).
+   - When all flagged stories' fixes land, run **full-epic Vitest + Playwright + spec-compliance-watchdog** as the cross-story regression gate. Failures here go back into the fix cycle.
+   - Re-prompt manual verification ONLY for the stories that had findings.
+
+5. **Spec Compliance Check (Gate 6, epic-level)**: launch the **spec-compliance-watchdog** with prompt: `"Verify implementation matches specs across this epic. Compare against the epicPass.passStartedAt baseline diff (all stories in this epic)."` Any drift halts the commit and goes through the standard drift resolution.
+
+6. **Commit (Call C, single)**: once everything is green, launch **code-reviewer** Call C with prompt: `"Epic-level QA pass. Stage all epic changes. Commit with message: 'feat(epic-<N>): <epic name>'."` This is ONE commit covering all stories.
+
+7. **Per-story COMPLETE transitions**: after the single commit succeeds, run `node .claude/scripts/transition-phase.js --epic <N> --story <M> --to COMPLETE` for each story in order. The final transition will auto-advance to the next epic's STORIES (or feature complete).
+
+Fire dashboard update at each major milestone (E2E green, manual verify pass, commit).
+
 ### Phase: INTAKE
 
 INTAKE has two or three sequential agents depending on prototype format. Determine which one to resume based on artifacts:

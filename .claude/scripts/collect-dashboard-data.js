@@ -47,8 +47,30 @@ function collectData(state) {
     phaseStatus: state.phaseStatus || 'ready',
     featureComplete: state.featureComplete || false,
     featureName: state.featureName || extractFeatureNameFromFiles() || (manifest && manifest.featureName) || null,
-    lastUpdated: state.lastUpdated || null
+    lastUpdated: state.lastUpdated || null,
+    batchMode: state.batchMode || 'story'
   };
+
+  // --- Epic Pass block (batched epic mode only) ---
+  if (helpers.isBatchedEpic(state)) {
+    const ep = state.epicPass;
+    data.epicPass = {
+      phase: ep.phase,
+      storyOrder: ep.storyOrder,
+      storyPhases: ep.storyPhases,
+      passStartedAt: ep.passStartedAt,
+      fixCycles: ep.fixCycles || {},
+      qaFindings: ep.qaFindings || {},
+      // Derived: how far through the pass are we?
+      progress: {
+        completed: Object.values(ep.storyPhases).filter(p => p === 'COMPLETE').length,
+        inProgress: Object.values(ep.storyPhases).filter(p => p === 'IN_PROGRESS').length,
+        pending: Object.values(ep.storyPhases).filter(p => p === 'PENDING').length,
+        rework: Object.values(ep.storyPhases).filter(p => p === 'REWORK').length,
+        total: ep.storyOrder.length
+      }
+    };
+  }
 
   // --- Intake section (from INTAKE onward) ---
   if (state.intake) {

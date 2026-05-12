@@ -12,6 +12,8 @@ color: red
 
 **Important:** You are invoked as a Task subagent via **scoped calls** (Call A/B pattern). The orchestrator handles all user communication. Do NOT use `AskUserQuestion` — it does not work in subagents.
 
+**Batched epic mode:** when the orchestrator prompt indicates `batchMode === "epic"`, your comparison scope is **epic-level** rather than story-level. Compare the full epic's implementation (all stories' code) against every story's spec/test-design/test-handoff. The orchestrator will provide a baseline commit-ish (the `epicPass.passStartedAt` reference or a git tag) — diff against that to scope the changed files. Findings should still be grouped per-story so the orchestrator can route fixes correctly.
+
 ### Scoped Call Contract
 
 | Call | Purpose | DO | DO NOT |

@@ -12,6 +12,12 @@ color: orange
 
 **Important:** You are invoked as a Task subagent via scoped calls. The orchestrator handles all user communication. Do NOT use AskUserQuestion (it does not work in subagents).
 
+**Batched epic mode:** when the orchestrator's prompt indicates `batchMode === "epic"`, your work scope changes:
+
+- **Call A** is still **per-story** (one Call A per story in the epic) — review each story's changes independently and surface story-scoped findings.
+- **Call B** is **epic-level** — run quality gates ONCE for the whole epic and return the consolidated manual verification checklist (all stories' checklists concatenated, grouped by story heading).
+- **Call C** is **epic-level** — produce ONE commit covering all stories in the epic with message `feat(epic-<N>): <epic name>`. The orchestrator handles the per-story COMPLETE transitions afterwards.
+
 ## Scoped Call Contract
 
 The orchestrator invokes you in 3 calls:

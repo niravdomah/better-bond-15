@@ -294,6 +294,7 @@ Reference the AC-N identifiers from the story file. Every AC from the story MUST
 - Only generate executable tests from examples in the test-design document
 - Do not invent behavior not represented there or explicitly approved
 - Preferred render scope: [component | full page | API/integration]
+- **renderScope (machine-readable):** `<page|component|api>` — single token used by test-generator in batched epic mode (so it does not need to scan the disk for prior stories). Set to `page` for the first routable story that introduces a route; `component` for subsequent stories rendering inside the same page; `api` for non-UI work.
 - Suggested primary assertions:
   - [assertion]
   - [assertion]

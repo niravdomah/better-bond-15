@@ -574,6 +574,8 @@ export interface Portfolio {
 
 **Default to the narrowest scope that covers the story's acceptance criteria.**
 
+**In batched epic mode**, prefer the `renderScope` field on the test-handoff doc (set by test-designer) over scanning the disk. If `renderScope` is present, follow it: `page` = render the full page, `component` = render the component in isolation, `api` = no UI render. The orchestrator passes `batchMode === "epic"` in your prompt when this applies. Fall through to the table below only when `renderScope` is missing (legacy or test-designer omission).
+
 | Story type | Render | Why |
 |------------|--------|-----|
 | Story targets a specific component (chart, grid, form) | Render that component directly | Isolates failures — a broken sibling doesn't cascade |
