@@ -37,9 +37,9 @@ For each epic:
   feature-planner (STORIES) → Define stories for THIS epic → user approves
 ```
 
-**Stage 3: Per-epic iteration — batched by phase (default) or per-story (legacy)**
+**Stage 3: Per-epic iteration — TDD flow**
 
-**Batched epic mode (default for new epics):** all stories advance one phase at a time as a "pass". The single epic-level QA collapses per-story manual verification and produces ONE commit at the end of the epic.
+All stories in an epic advance one phase at a time as a "pass". The single epic-level QA collapses manual verification across stories and produces ONE commit at the end of the epic.
 ```
 For each epic:
   REALIGN pass (story 1 → 2 → 3)  → TEST-DESIGN pass (story 1 → 2 → 3)
@@ -47,15 +47,7 @@ For each epic:
     → IMPLEMENT pass (story 1 → 2 → 3, strict order — story N reads N-1's code)
     → EPIC-QA (single E2E + manual verification + commit covering all stories)
 ```
-See [orchestrator-rules.md § Batched Epic-Level Flow](../shared/orchestrator-rules.md#batched-epic-level-flow) for the pass-by-pass execution model.
-
-**Legacy per-story mode:** each story runs through every phase end-to-end before the next story begins.
-```
-For each story in the epic:
-  feature-planner → test-designer → test-generator → developer → code-reviewer → commit & push
-      REALIGN        TEST-DESIGN     WRITE-TESTS     IMPLEMENT      QA
-```
-Opt back into per-story via `node .claude/scripts/transition-phase.js --downgrade-epic-to-story <N>`.
+See [orchestrator-rules.md § Epic-Level TDD Flow](../shared/orchestrator-rules.md#epic-level-tdd-flow) for the pass-by-pass execution model.
 
 **REALIGN:** Reviews any discovered impacts from previous stories and revises the upcoming story. Auto-completes if no impacts exist.
 **TEST-DESIGN:** Produces a BA-reviewable specification-by-example document before tests are written. Surfaces missing business decisions.
@@ -66,9 +58,9 @@ This ensures:
 - Stories defined per-epic (not all upfront) for flexibility
 - Tests written immediately before each story (true TDD)
 - Quality gates always pass (no skipped tests)
-- One commit per story after QA passes
-- Early feedback through per-story review
-- Faster pivots - discover issues per-story, not per-epic
+- One epic-level commit after EPIC-QA passes
+- Early feedback through per-pass review
+- Faster pivots — one epic at a time, with per-story scoping inside each pass
 - Implementation learnings feed back into future story planning via REALIGN
 - **FRS requirements override template code** — agents must implement what the spec says, not extend template scaffolding (see orchestrator-rules.md § FRS-Over-Template Rule)
 
@@ -701,6 +693,6 @@ After the user runs `/clear` + `/continue`, the workflow enters the mandatory DE
 After the user runs `/clear` + `/continue`, the workflow continues with:
 
 1. **SCOPE**: The feature-planner defines all epics from the FRS
-2. **Per-epic and per-story phases**: STORIES, REALIGN, TEST-DESIGN, WRITE-TESTS, IMPLEMENT, QA
+2. **Per-epic pass-based phases**: STORIES, then REALIGN → TEST-DESIGN → WRITE-TESTS → IMPLEMENT passes, then EPIC-QA
 
 These phases are managed by `/continue` based on the workflow state. See [continue.md](./continue.md) for resumption logic and [orchestrator-rules.md](../shared/orchestrator-rules.md#per-phase-scoped-call-prompts) for the full scoped-call patterns.

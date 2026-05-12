@@ -444,16 +444,16 @@ function buildTodoList(state) {
 
     // EXPANDED: current epic
     // --- STORIES phase item for this epic ---
-    // In batched epic mode, STORIES is definitionally complete (the upgrade
-    // requires story files to exist). In legacy mode, the epic's parent phase
-    // field still says "STORIES" while individual stories iterate, so a
+    // STORIES is definitionally complete once epicPass exists (auto-initialised
+    // at the STORIES → REALIGN transition for story 1). The parent epic.phase
+    // field may still say "STORIES" while individual stories iterate, so a
     // secondary signal is needed: any non-PENDING story phase means STORIES
     // is done.
-    const inBatchedMode = helpers.isBatchedEpic(state) && isCurrentEpic;
+    const epicHasPass = helpers.hasEpicPass(state) && isCurrentEpic;
     const hasStartedStories = epicState?.stories && Object.values(epicState.stories)
       .some(s => s.phase && s.phase !== 'PENDING');
     const storiesPhaseComplete = (epicState && epicState.phase !== 'STORIES' &&
-      getTotalStories(epicState, e) > 0) || inBatchedMode || hasStartedStories;
+      getTotalStories(epicState, e) > 0) || epicHasPass || hasStartedStories;
     const isStoriesActive = state.currentPhase === 'STORIES' && isCurrentEpic;
     const totalStories = getTotalStories(epicState, e);
     const storiesSuffix = storiesPhaseComplete && totalStories > 0 ?
@@ -471,11 +471,11 @@ function buildTodoList(state) {
       continue;
     }
 
-    // --- BATCHED EPIC MODE: render pass-based progress ---
-    // In batched mode, all stories advance pass-by-pass instead of each story
-    // running through every phase. Emit a sub-item per pass showing how far
-    // through the pass we are.
-    if (helpers.isBatchedEpic(state) && isCurrentEpic) {
+    // --- Pass-based progress for the current epic ---
+    // All stories advance pass-by-pass through REALIGN → TEST-DESIGN →
+    // WRITE-TESTS → IMPLEMENT → EPIC-QA. Emit a sub-item per pass showing
+    // how far through the pass we are.
+    if (helpers.hasEpicPass(state) && isCurrentEpic) {
       const ep = state.epicPass;
       const passList = helpers.EPIC_PASS_ORDER; // REALIGN, TEST-DESIGN, ..., EPIC-QA
       const currentPassIdx = passList.indexOf(ep.phase);
@@ -514,11 +514,12 @@ function buildTodoList(state) {
           activeForm: PASS_ACTIVE[pass]
         });
       }
-      // Skip the legacy per-story sub-phase rendering for this epic
+      // Pass-based rendering covered this epic — skip the defensive
+      // per-story fallback below.
       continue;
     }
 
-    // --- PER-STORY ITEMS for current epic ---
+    // --- PER-STORY ITEMS for current epic (defensive fallback when epicPass is absent) ---
     const futureStories = [];
 
     for (let s = 1; s <= totalStories; s++) {

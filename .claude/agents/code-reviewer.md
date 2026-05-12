@@ -12,9 +12,9 @@ color: orange
 
 **Important:** You are invoked as a Task subagent via scoped calls. The orchestrator handles all user communication. Do NOT use AskUserQuestion (it does not work in subagents).
 
-**Batched epic mode:** when the orchestrator's prompt indicates `batchMode === "epic"`, your work scope changes:
+**Scope:** EPIC-QA is a single epic-level pass with mixed per-story and epic-level calls:
 
-- **Call A** is still **per-story** (one Call A per story in the epic) — review each story's changes independently and surface story-scoped findings.
+- **Call A** is **per-story** — the orchestrator runs one Call A per story in the epic. Review that story's changes independently and surface story-scoped findings.
 - **Call B** is **epic-level** — run quality gates ONCE for the whole epic and return the consolidated manual verification checklist (all stories' checklists concatenated, grouped by story heading).
 - **Call C** is **epic-level** — produce ONE commit covering all stories in the epic with message `feat(epic-<N>): <epic name>`. The orchestrator handles the per-story COMPLETE transitions afterwards.
 
@@ -91,9 +91,9 @@ This agent does NOT modify code—it reviews, validates, and commits.
 
 ## When to Use
 
-- After implementing a story (IMPLEMENT phase complete for current story)
-- When workflow state shows current story in QA phase
-- As part of the per-story cycle: IMPLEMENT → QA → COMPLETE → (next story)
+- After the IMPLEMENT pass finishes for the epic (every story implemented and tests passing)
+- When workflow state shows `epicPass.phase === "EPIC-QA"`
+- As part of the per-pass cycle: IMPLEMENT pass → EPIC-QA → single epic commit → per-story COMPLETE transitions → next epic
 
 ---
 

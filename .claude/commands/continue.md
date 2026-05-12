@@ -17,14 +17,15 @@ The TDD workflow has four stages:
 0. **Requirements gathering**: INTAKE (intake-agent → [prototype-review-agent, v2 only] → intake-brd-review-agent)
 1. **One-time setup**: DESIGN (mandatory) → SCOPE (define all epics, no stories yet)
 2. **Per-epic**: STORIES (define stories for the current epic only)
-3. **Per-story iteration**: REALIGN → TEST-DESIGN → WRITE-TESTS → IMPLEMENT → QA → commit → (next story)
+3. **Per-epic iteration**: REALIGN pass → TEST-DESIGN pass → WRITE-TESTS pass → IMPLEMENT pass → EPIC-QA → epic commit → (next epic)
 
-After QA passes for a story:
+Stories within a pass run sequentially (Story 1 → 2 → 3). EPIC-QA produces a single epic-level commit covering every story.
 
-- If more stories in epic → REALIGN for next story
-- If no more stories but more epics → STORIES for next epic
-- If last story in a phase's last epic (phasing enabled) → PHASE-BOUNDARY (user chooses Continue or Stop)
-- If no more stories and no more epics → Feature complete!
+After the EPIC-QA commit:
+
+- If more epics → STORIES for next epic
+- If last epic in a phase (phasing enabled) → PHASE-BOUNDARY (user chooses Continue or Stop)
+- If no more epics → Feature complete!
 
 ## Step 1: Validate Workflow State and Restore Progress Display
 
@@ -81,22 +82,19 @@ Find the phase below matching the current phase in the state JSON, and execute i
 - **NEVER suppress spec drift findings.** When composing the spec-compliance-watchdog prompt, do NOT include instructions to ignore, skip, or excuse any changes — regardless of how or why the drift occurred (including user-approved QA fix-cycle changes). Pass fix-cycle context as informational background only.
 - Follow all rules in orchestrator-rules.md — especially scoped call patterns, voice guidelines, commit policy, and the FRS-Over-Template Rule.
 
-### Batched Epic Mode Dispatch (check FIRST)
+### Epic Pass Dispatch (per-story work)
 
-**Before dispatching to a per-story phase, check whether the workflow is in batched epic mode.**
-
-If the state JSON has `workflow.batchMode === "epic"` and `epicPass` is present:
+Once an epic enters per-story work, dispatch to the matching `### Phase: EPIC-<PASS>` section based on `state.epicPass.phase`:
 
 - The current pass is `state.epicPass.phase` (one of: `REALIGN`, `TEST-DESIGN`, `WRITE-TESTS`, `IMPLEMENT`, `EPIC-QA`).
 - The story currently IN_PROGRESS within the pass is `state.currentStory` (mirrored in `epicPass.storyPhases[currentStory]`).
-- **Dispatch to the matching `### Phase: EPIC-<PASS>` section below**, NOT the per-story phase sections.
-- The legacy per-story sections (`### Phase: REALIGN`, etc.) only apply when `batchMode === "story"` (the legacy default).
+- `epicPass` is auto-initialised by `transition-phase.js` at the STORIES → REALIGN transition for story 1. If it's missing for an epic past STORIES, run `node .claude/scripts/transition-phase.js --init-epic-pass <N>` to recover.
 
 **Pass progression invariants:**
 
 - Stories within a pass run sequentially (Story 1 → Story 2 → Story 3). When a story completes the current pass, run `--complete-story-pass --story M` to mark it COMPLETE and promote the next pending story to IN_PROGRESS.
 - When every story has completed the pass, run `--advance-pass` to flip to the next pass (resets all `storyPhases` to PENDING, marks story 1 IN_PROGRESS, updates `epicPass.phase`).
-- Do NOT call `transition-phase.js --to <PHASE>` for individual story phase transitions while in batched mode. Use `--complete-story-pass` and `--advance-pass` instead.
+- Do NOT call `transition-phase.js --to <PHASE>` for individual story phase transitions while passes are in flight. Use `--complete-story-pass` and `--advance-pass` instead. The standard `--to COMPLETE` transitions only happen at the end of EPIC-QA, after the epic commit, to advance to the next epic.
 
 ### Phase: EPIC-REALIGN
 
@@ -104,7 +102,7 @@ Current epic: state.currentEpic. Current story (in flight): state.currentStory.
 
 For the in-flight story (and each subsequent PENDING story afterwards within this pass):
 
-1. Run the realign agent's Call A autonomously for the story (use the existing per-story REALIGN prompt — see [orchestrator-rules.md § REALIGN](../shared/orchestrator-rules.md#realign-1-2-scoped-calls)).
+1. Run the realign agent's Call A autonomously for the story (use the per-story REALIGN prompt from [orchestrator-rules.md § REALIGN](../shared/orchestrator-rules.md#realign-1-2-scoped-calls), applied within the pass).
 2. If Call A reports `impactsFound: false` → mark `--complete-story-pass --story M` immediately (auto-complete, no user prompt). Move to the next PENDING story.
 3. If Call A reports impacts → COLLECT them but do NOT prompt yet. Continue running Call A for the remaining PENDING stories in the pass.
 4. **After all stories in the pass have run Call A**, present a single batched `AskUserQuestion` (up to 4 questions, grouped by story) covering every story that had impacts. On approval, run Call B per story to apply changes. Mark each story COMPLETE via `--complete-story-pass --story M`.
@@ -147,7 +145,7 @@ Strict order is required because Story N's developer agent reads Story N-1's jus
 
 ### Phase: EPIC-QA
 
-This is a single epic-level QA: one E2E verification, one consolidated manual verification, one big commit at the end. Per-story QA Call A may still run individually for spec-compliance scoping, but Call B/C are epic-level.
+A single epic-level QA pass: one E2E run, one consolidated manual verification, one commit covering every story. Per-story Call A still runs individually for spec-compliance scoping; Call B (quality gates) and Call C (commit) are epic-level.
 
 1. **Per-story Call A (review-mode)**: for each story in `epicPass.storyOrder`, launch the **code-reviewer** agent Call A with story-level scope. Collect findings. Do NOT commit yet.
 
@@ -264,52 +262,6 @@ When launching Call B, include the user's phase decision:
 Current epic: [N]
 
 Run STORIES per [orchestrator-rules.md § STORIES](../shared/orchestrator-rules.md#stories-2-scoped-calls) (canonical — includes Call A/B prompts and approval flow).
-
-### Phase: REALIGN
-
-Current epic: [N], Current story: [M]
-
-Run REALIGN per [orchestrator-rules.md § REALIGN](../shared/orchestrator-rules.md#realign-1-2-scoped-calls) (canonical — covers the auto-completed and revisions-proposed branches).
-
-After REALIGN completes, proceed directly to TEST-DESIGN.
-
-### Phase: TEST-DESIGN
-
-Current epic: [N], Current story: [M]
-Story file: [path from state]
-
-Run TEST-DESIGN per [orchestrator-rules.md § TEST-DESIGN](../shared/orchestrator-rules.md#test-design-2-scoped-calls--ba-decision-persistence) (canonical — includes the Call A prompt, `list-ba-decisions.js` enumeration, doc display rules, batched `AskUserQuestion` for >3 decisions, `resolve-ba-decision.js` persistence, and Call B transition).
-
-After Call B returns, proceed directly to WRITE-TESTS.
-
-### Phase: WRITE-TESTS
-
-Current epic: [N], Current story: [M]
-Story file: [path from state]
-
-This phase is fully autonomous. Use the WRITE-TESTS prompt from [orchestrator-rules.md § WRITE-TESTS](../shared/orchestrator-rules.md#write-tests-single-call--fully-autonomous) (canonical — includes the test-handoff path argument).
-
-After it returns:
-- Fire dashboard update.
-- Proceed directly to IMPLEMENT (execute the IMPLEMENT instructions below).
-
-### Phase: IMPLEMENT
-
-Current epic: [N], Current story: [M]
-
-Run IMPLEMENT per [orchestrator-rules.md § IMPLEMENT](../shared/orchestrator-rules.md#implement-single-call--fully-autonomous) (canonical — single autonomous call; the agent reads the story and test-handoff, captures a baseline `npm test` run, implements, re-tests, and returns a summary).
-
-After it returns:
-- Fire dashboard update.
-- Proceed directly to QA.
-
-### Phase: QA
-
-Current epic: [N], Current story: [M]
-
-QA runs the full canonical flow defined in [orchestrator-rules.md § QA (3 scoped calls)](../shared/orchestrator-rules.md#qa-3-scoped-calls): Call A → Call B → E2E Verification (Gate 6a) → Manual Verification → Spec Compliance Check (Gate 6) → Call C.
-
-Resumption-specific routing: read the workflow state and re-enter the loop at whichever sub-step was interrupted. Use the canonical Call A/B/C prompts, the E2E Verification procedure (including halt prompts, the 3-cycle fix cap, and `e2eStatus` persistence), the QA Fix Cycle, and the Spec Compliance Check exactly as defined in orchestrator-rules.md — do not paraphrase. The verification checklist file at `generated-docs/qa/epic-N-[slug]/story-M-[slug]-verification-checklist.md` is the source of truth for every re-verification prompt; read it verbatim each time.
 
 ### Phase: PHASE-BOUNDARY
 

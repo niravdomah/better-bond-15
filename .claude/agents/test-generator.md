@@ -574,7 +574,7 @@ export interface Portfolio {
 
 **Default to the narrowest scope that covers the story's acceptance criteria.**
 
-**In batched epic mode**, prefer the `renderScope` field on the test-handoff doc (set by test-designer) over scanning the disk. If `renderScope` is present, follow it: `page` = render the full page, `component` = render the component in isolation, `api` = no UI render. The orchestrator passes `batchMode === "epic"` in your prompt when this applies. Fall through to the table below only when `renderScope` is missing (legacy or test-designer omission).
+Read the `renderScope` field on the test-handoff doc (set by test-designer) and follow it: `page` = render the full page, `component` = render the component in isolation, `api` = no UI render. This avoids scanning the disk for prior stories. If `renderScope` is missing from an older handoff doc, fall through to the table below.
 
 | Story type | Render | Why |
 |------------|--------|-----|

@@ -47,12 +47,11 @@ function collectData(state) {
     phaseStatus: state.phaseStatus || 'ready',
     featureComplete: state.featureComplete || false,
     featureName: state.featureName || extractFeatureNameFromFiles() || (manifest && manifest.featureName) || null,
-    lastUpdated: state.lastUpdated || null,
-    batchMode: state.batchMode || 'story'
+    lastUpdated: state.lastUpdated || null
   };
 
-  // --- Epic Pass block (batched epic mode only) ---
-  if (helpers.isBatchedEpic(state)) {
+  // --- Epic Pass block (present once an epic enters per-story work) ---
+  if (helpers.hasEpicPass(state)) {
     const ep = state.epicPass;
     data.epicPass = {
       phase: ep.phase,
@@ -234,9 +233,9 @@ function collectData(state) {
     if (ds) data.api.dataSource = ds;
   }
 
-  // --- Test design traceability (legacy single-story field for backward compat) ---
-  // Per-story traceability is now in data.epics[].stories[].traceability
-  // Keep data.testDesign as a convenience pointer to the current story's data
+  // --- Test design traceability (convenience pointer to the current story) ---
+  // Per-story traceability is also in data.epics[].stories[].traceability — that
+  // is the source of truth; data.testDesign just narrows it to the in-flight story.
   if (state.currentEpic && state.currentStory && data.epics) {
     const currentStoryObj = data.epics
       .find(e => e.number === state.currentEpic)

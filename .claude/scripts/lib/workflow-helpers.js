@@ -1389,28 +1389,35 @@ function checkStaleness(pausedAt) {
 }
 
 // =============================================================================
-// BATCHED EPIC-LEVEL FLOW (epicPass)
+// EPIC PASS (per-story progression within an epic)
 // =============================================================================
 //
-// In batched mode (`state.batchMode === "epic"`), all stories in an epic
-// advance one phase at a time as a single "pass" rather than each story
-// running through every phase before the next story begins. The pass order
-// is: REALIGN → TEST-DESIGN → WRITE-TESTS → IMPLEMENT → EPIC-QA → COMPLETE.
+// `state.epicPass` is the canonical substate tracking how far each story in
+// an epic has progressed through the pass-based TDD flow. All stories in
+// an epic advance one phase at a time as a single "pass". The pass order
+// is: REALIGN → TEST-DESIGN → WRITE-TESTS → IMPLEMENT → EPIC-QA, followed
+// by per-story COMPLETE transitions after the single epic-level commit.
 //
-// EPIC-QA is collapsed into a single epic-level QA (one verification, one
-// commit) instead of per-story QA. The per-story phases iterate
-// sequentially within a pass (Story 1 → 2 → 3) because the developer
-// agent reads prior-story code; tests for later stories are written
-// against the test-handoff metadata, not against on-disk code.
+// EPIC-QA is a single epic-level QA (one verification, one commit) covering
+// every story in the epic. Within the IMPLEMENT pass, stories run strictly
+// sequentially (Story 1 → 2 → 3) so each developer agent invocation can
+// read the prior story's just-implemented code. Tests for later stories
+// are written against the test-handoff metadata, not against on-disk code.
+//
+// epicPass is auto-initialised by transition-phase.js at the STORIES →
+// REALIGN transition for story 1 of an epic. The --init-epic-pass <N>
+// flag is provided as a manual fallback for repair / migration scenarios.
 
 const EPIC_PASS_ORDER = ['REALIGN', 'TEST-DESIGN', 'WRITE-TESTS', 'IMPLEMENT', 'EPIC-QA'];
 const EPIC_PASS_STORY_STATES = ['PENDING', 'IN_PROGRESS', 'COMPLETE', 'REWORK'];
 
 /**
- * Returns true when the workflow is operating in batched epic mode.
+ * Returns true when the workflow state carries an epicPass substate
+ * (i.e. an epic has entered per-story work). Epics still in INTAKE /
+ * DESIGN / SCOPE / STORIES legitimately have no epicPass yet.
  */
-function isBatchedEpic(state) {
-  return Boolean(state && state.batchMode === 'epic' && state.epicPass);
+function hasEpicPass(state) {
+  return Boolean(state && state.epicPass);
 }
 
 /**
@@ -1659,8 +1666,8 @@ module.exports = {
   computeGroupStatus,
   checkStaleness,
 
-  // Batched epic-level flow
-  isBatchedEpic,
+  // Epic pass (per-story progression within an epic)
+  hasEpicPass,
   readEpicPass,
   writeEpicPass,
   initEpicPass,

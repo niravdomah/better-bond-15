@@ -308,6 +308,8 @@ See the [Finalize DESIGN](#finalize-design) section below (unchanged).
 
 These are the full call prompts for each phase. Both `/start` and `/continue` reference these when invoking agents.
 
+The per-story phases (REALIGN, TEST-DESIGN, WRITE-TESTS, IMPLEMENT, QA) describe what runs **once per story within the corresponding epic-level pass**. The orchestrator iterates through `epicPass.storyOrder` and runs the appropriate Call A/B/C for each story. See `## Epic-Level TDD Flow` below for how passes orchestrate these per-story invocations (batched user-gating, BA decision buffering, EPIC-QA collapsing).
+
 ### DESIGN Scoped Calls
 
 **design-api-agent (2 calls):**
@@ -792,30 +794,17 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 feat(epic-2)!: story 3 — replace legacy auth with OAuth2
 ```
 
-## Batched Epic-Level Flow
+## Epic-Level TDD Flow
 
-The TDD workflow supports two execution models per epic:
-
-| Model | `state.batchMode` | Per-story granularity |
-|-------|-------------------|------------------------|
-| **Legacy per-story** | `"story"` (default for projects pre-dating this section) | Each story flows REALIGN → TEST-DESIGN → WRITE-TESTS → IMPLEMENT → QA → commit before the next story begins. One commit per story. |
-| **Batched epic** | `"epic"` (default for new epics) | All stories advance one pass at a time. Single epic-level QA. ONE commit at the end of the epic. |
-
-The legacy per-story sections in this document (REALIGN, TEST-DESIGN, WRITE-TESTS, IMPLEMENT, QA) apply when `batchMode === "story"`. The batched-mode rules below apply when `batchMode === "epic"`.
-
-### When to use batched mode
-
-- Default for new epics. Saves roughly two-thirds of the user-gating round-trips (one batched approval per pass instead of one per story per pass).
-- Trade-off: cross-story regressions take longer to surface (no per-story commits, no per-story QA gate). The full-epic Vitest + Playwright + spec-compliance re-run during EPIC-QA fix cycles mitigates this — see the Fix Cycle rules below.
+Within an epic, all stories advance one phase at a time as a "pass". The pass order is REALIGN → TEST-DESIGN → WRITE-TESTS → IMPLEMENT → EPIC-QA. Stories within a pass run sequentially (Story 1 → 2 → 3). EPIC-QA is a single epic-level QA producing ONE commit covering every story. Cross-story regressions are caught by the full-epic Vitest + Playwright + spec-compliance gate that runs after every per-story fix cycle — see the EPIC-QA Fix Cycle rules below.
 
 ### State model
 
 ```jsonc
 {
-  "batchMode": "epic",
   "currentEpic": 1,
   "currentStory": 2,                        // story currently IN_PROGRESS within the current pass
-  "currentPhase": "WRITE-TESTS",            // mirrors epicPass.phase for legacy tooling
+  "currentPhase": "WRITE-TESTS",            // mirrors epicPass.phase for the dashboard and /status
   "epicPass": {
     "phase": "WRITE-TESTS",                 // REALIGN | TEST-DESIGN | WRITE-TESTS | IMPLEMENT | EPIC-QA
     "storyOrder": [1, 2, 3],                // frozen at pass start
@@ -831,19 +820,18 @@ The legacy per-story sections in this document (REALIGN, TEST-DESIGN, WRITE-TEST
 }
 ```
 
-`state.epics[N].stories[M].phase` continues to mirror `epicPass.storyPhases` so the dashboard, legacy `/status` output, and `validate-phase-output.js` keep working unchanged.
+`state.epics[N].stories[M].phase` mirrors `epicPass.storyPhases` so the dashboard, `/status` output, and `validate-phase-output.js` all see consistent per-story progress.
 
 ### Pass progression invariants
 
 1. **Stories within a pass run sequentially** — Story 1 → 2 → 3. Within a pass, only one story is IN_PROGRESS at a time.
 2. **Pass-end requires every story COMPLETE in `storyPhases`** before the pass can advance.
 3. **EPIC-IMPLEMENT requires strict story order** because each story's developer reads prior stories' just-implemented code.
-4. **No per-story commit during passes 1-4** — work accumulates on the working tree until EPIC-QA produces ONE commit.
+4. **No commits during passes 1-4** — work accumulates on the working tree until EPIC-QA produces ONE commit.
 
 ### CLI surface
 
-- `node .claude/scripts/transition-phase.js --upgrade-epic-to-batched <N>` — flip epic N into batched mode and initialise `epicPass`.
-- `node .claude/scripts/transition-phase.js --downgrade-epic-to-story <N>` — revert epic N to legacy mode (state is restored without batched substate).
+- `node .claude/scripts/transition-phase.js --init-epic-pass <N>` — explicit fallback that initialises `epicPass` for epic N. Normally auto-fires at the STORIES → REALIGN transition for story 1; use this manual form for repair scenarios.
 - `node .claude/scripts/transition-phase.js --complete-story-pass [--story M]` — mark a story as COMPLETE in the current pass and promote the next PENDING story to IN_PROGRESS.
 - `node .claude/scripts/transition-phase.js --advance-pass` — flip `epicPass.phase` to the next pass (REALIGN→TEST-DESIGN→WRITE-TESTS→IMPLEMENT→EPIC-QA). Requires every story in the current pass to be COMPLETE.
 - `node .claude/scripts/transition-phase.js --record-qa-finding --story M --note "..."` — store a QA finding under `epicPass.qaFindings[M]` during EPIC-QA.
@@ -896,13 +884,13 @@ The single QA pass for the entire epic. One E2E run, one batched manual verifica
 
 ### Resumption from `/clear`
 
-Detection rules for `/continue` when `state.batchMode === "epic"`:
+Detection rules for `/continue` when `state.epicPass` is present:
 
 1. If any `storyPhases[n] === "IN_PROGRESS"` → **mid-pass interruption**. Resume that story's work for the current `epicPass.phase`.
 2. Else if every `storyPhases[n] === "COMPLETE"` → **between-pass interruption**. Run `--advance-pass`, then start story 1 of the new pass.
 3. Else (all PENDING with no IN_PROGRESS) → pass-start interruption. Mark story 1 as IN_PROGRESS and launch its phase work.
 
-The `--repair` flag detects batched mode from disk artifacts (multiple stories in the same non-COMPLETE phase = batched pass in flight) and rebuilds `epicPass` automatically.
+The `--repair` flag detects pass state from disk artifacts (multiple stories in the same non-COMPLETE phase = pass in flight) and rebuilds `epicPass` automatically.
 
 ### Risks and mitigations (built into the design)
 

@@ -123,9 +123,9 @@ As you complete each acceptance criterion, update the story file to check it off
 
 ### Phase 1.5: Codebase Scan
 
-**Before writing any code**, do a quick inventory of what already exists in `web/src/` that is relevant to the current story. This prevents rebuilding utilities, components, or patterns the template (or earlier stories) already provide.
+**Before writing any code**, do a quick inventory of what already exists in `web/src/` that is relevant to the current story. This prevents rebuilding utilities, components, or patterns the template (or earlier stories in the IMPLEMENT pass) already provide.
 
-> **Batched epic mode note:** if the orchestrator's prompt says you are story M in an `EPIC-IMPLEMENT` pass (e.g., "Stories 1..M-1 have already implemented within this pass — their code is on disk"), treat all on-disk code from this epic as authoritative. Do NOT rebuild components, utilities, types, or layouts that prior stories in the pass produced — extend their patterns instead. The Phase 1.5 scan still applies and is the primary mechanism for finding what they did.
+> **Pass ordering:** the orchestrator runs IMPLEMENT for each story in `epicPass.storyOrder` strictly sequentially. By the time you run for story M, stories 1..M-1 in the same epic have already implemented — their code is on disk. Treat that on-disk code as authoritative; extend its patterns rather than rebuilding what they produced. The Phase 1.5 scan is the primary mechanism for finding what they did.
 
 **Scan procedure:**
 

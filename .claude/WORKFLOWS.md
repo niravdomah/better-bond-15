@@ -308,9 +308,9 @@ For each story in the epic:
 - ✅ Stories defined per-epic for flexibility to pivot
 - ✅ Tests written immediately before each story (true TDD)
 - ✅ Quality gates always pass (no skipped tests)
-- ✅ One commit per story after QA passes
-- ✅ Early feedback through per-story review
-- ✅ Faster pivots - discover issues per-story, not per-epic
+- ✅ One epic-level commit after EPIC-QA passes
+- ✅ Early feedback through per-pass review
+- ✅ Faster pivots — one epic at a time, with per-story scoping inside each pass
 - ✅ Implementation learnings feed back into future story planning via REALIGN
 
 ### Discovered Impacts
