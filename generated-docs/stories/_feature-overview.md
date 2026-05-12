@@ -6,7 +6,7 @@ A web-based payment management interface for BetterBond payment administrators t
 
 ## Epics
 
-1. **Epic 1: Foundation — Auth, Branding, Navigation, and API Setup** - Configure next-auth credentials provider, apply MortgageMax branding (navy #1A3A6E, teal accent, light mode), implement the top navigation bar with active-route highlighting, and wire the API client to the backend at `http://localhost:8042`. Replaces any template auth/demo code that conflicts with the FRS. | Status: Pending | Dir: `epic-1-foundation/`
+1. **Epic 1: Foundation — Auth, Branding, Navigation, and API Setup** - Configure next-auth credentials provider, apply MortgageMax branding (navy #1A3A6E, teal accent, light mode), implement the top navigation bar with active-route highlighting, and wire the API client to the backend at `http://localhost:8042`. Replaces any template auth/demo code that conflicts with the FRS. | Status: In Progress | Dir: `epic-1-foundation/`
 2. **Epic 2: Dashboard** - Implement the Dashboard home page: fetch from `GET /v1/payments/dashboard`, render three metric cards (ready-to-pay count, payments-made count + total value last 14 days in R format, parked count), Payment Status Report grid, and Parked Payments Aging Report grid with a shared AgencyName client-side filter dropdown. Full loading, error, and empty states. | Status: Pending | Dir: `epic-2-dashboard/`
 3. **Epic 3: Payment Management** - Implement the Payment Management page: fetch from `GET /v1/payments`, render the paginated payment grid (20 rows/page) with AgencyName filter, per-row and header checkboxes, Park/Unpark bulk mutation buttons (disabled when nothing selected), and the Initiate Payments button (enabled only when an agency is selected and REG-status payments exist). Full post-mutation refresh, toast notifications for success and error, and empty state. | Status: Pending | Dir: `epic-3-payment-management/`
 4. **Epic 4: Payments Made / Batch List** - Implement the Payments Made page: fetch from `GET /v1/payment-batches`, render the paginated batch list (20 rows/page) with per-row "Download PDF" button (`POST /v1/payment-batches/{Id}/download-invoice-pdf`), empty state, and Reset Demo Data button (`POST /demo/reset-demo`, no confirmation dialog). Full toast notifications for PDF download errors, reset success, and reset errors. | Status: Pending | Dir: `epic-4-payments-made/`
@@ -30,3 +30,11 @@ A web-based payment management interface for BetterBond payment administrators t
 **Recommended implementation order: 1 → 2 → 3 → 4**
 
 Epics 2, 3, and 4 can technically run in parallel after Epic 1 completes, but sequential order is recommended because: (a) Dashboard provides the home-page anchor that validates the auth redirect flow end-to-end, (b) Payment Management is the core workflow and should be verified before the batch list in Epic 4, and (c) the Reset Demo Data button in Epic 4 resets all data — running Epic 4 last avoids disrupting development of Epics 2 and 3.
+
+## Epic 1 Stories
+
+| Story | Title | File | Status |
+|-------|-------|------|--------|
+| 1.1 | MortgageMax Branding and Sign-In Page | `epic-1-foundation/story-1-branding-and-signin.md` | Pending |
+| 1.2 | Top Navigation Bar and App Shell | `epic-1-foundation/story-2-top-nav-and-app-shell.md` | Pending |
+| 1.3 | API Client Configuration and Utilities | `epic-1-foundation/story-3-api-client-and-utilities.md` | Pending |
