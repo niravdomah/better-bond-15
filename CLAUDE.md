@@ -4,14 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Template repository** for building frontend applications with:
+**BetterBond Commission Payments POC** - A web-based payment management interface for payment administrators to review, park/unpark, and initiate bulk commission payment batches, with downloadable invoice PDFs.
 
-- Next.js 16 (App Router) + React 19 + TypeScript 5 (strict)
-- Tailwind CSS 4 + Shadcn UI (via MCP server)
-- Vitest + React Testing Library
-- Production-ready API client for OpenAPI-defined REST endpoints
+**Tech Stack:** Next.js 16 + React 19 + TypeScript 5 + Tailwind CSS 4 + Shadcn UI
 
-Users clone this template and use Claude Code to generate features, components, and API integrations.
+**Backend API:** Defined in `generated-docs/specs/api-spec.yaml`. Connects to live REST API at `http://localhost:8042`. Browser calls backend directly (no Next.js proxy — backend sends proper CORS headers).
+
+**Planned Epics:**
+1. Foundation — Auth, Branding, Navigation, and API Setup - Configure next-auth credentials provider, MortgageMax branding (navy #1A3A6E, teal), top navigation bar, and API client wired to `http://localhost:8042`
+2. Dashboard - Dashboard home page with metric cards (ready-to-pay, payments-made last 14 days, parked) and dual report grids with shared AgencyName filter
+3. Payment Management - Paginated payment grid with park/unpark bulk actions, Initiate Payments button, and AgencyName client-side filter
+4. Payments Made / Batch List - Paginated batch list with PDF download per row and Reset Demo Data button
 
 ## Repository Structure
 
