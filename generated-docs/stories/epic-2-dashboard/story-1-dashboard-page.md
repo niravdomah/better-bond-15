@@ -39,7 +39,7 @@ Every acceptance criterion is prefixed with a sequential AC-N identifier. Format
 
 ### Metric Card — Ready to Pay
 
-- [ ] AC-6: Given the API has returned data, when I view the "Ready to Pay" metric card, then I see the total count of payments that have a `REG` status across all `PaymentStatusReport` rows (i.e., the sum of `PaymentCount` for all `PaymentStatusReportItem` rows where `Status` contains "REG").
+- [ ] AC-6: Given the API has returned data, when I view the "Ready to Pay" metric card, then I see the total count of payments that have a `REG` status across all `PaymentStatusReport` rows (i.e., the sum of `PaymentCount` for all `PaymentStatusReportItem` rows where `Status.toLowerCase() === "reg"` — exact case-insensitive equality, per resolved BA-4).
 - [ ] AC-7: Given the API has returned data, when I view the "Ready to Pay" metric card, then the count is a plain integer (no currency formatting — this is a count, not a value).
 
 ### Metric Card — Payments Made (Last 14 Days)
@@ -50,7 +50,7 @@ Every acceptance criterion is prefixed with a sequential AC-N identifier. Format
 
 ### Metric Card — Parked
 
-- [ ] AC-11: Given the API has returned data, when I view the "Parked" metric card, then I see the total count of payments that have a `PARKED` status across all `PaymentStatusReport` rows (i.e., the sum of `PaymentCount` for all `PaymentStatusReportItem` rows where `Status` contains "PARKED").
+- [ ] AC-11: Given the API has returned data, when I view the "Parked" metric card, then I see the total count of payments that have a `PARKED` status across all `PaymentStatusReport` rows (i.e., the sum of `PaymentCount` for all `PaymentStatusReportItem` rows where `Status.toLowerCase() === "parked"` — exact case-insensitive equality, consistent with the BA-4 rule).
 - [ ] AC-12: Given the API has returned data, when I view the "Parked" metric card, then the count is a plain integer (no currency formatting).
 
 ### Metric Cards — Agency Filter Does NOT Apply
@@ -161,13 +161,13 @@ No endpoints are missing — `GET /v1/payments/dashboard` is the only call requi
 
 The three metric cards are derived from the `PaymentsDashboardRead` response as follows:
 
-1. **Ready to Pay count** — Sum of `PaymentCount` from all `PaymentStatusReport` rows where `Status` contains `"REG"` (case-insensitive match recommended). Example: `paymentStatusReport.filter(r => r.Status.includes('REG')).reduce((sum, r) => sum + r.PaymentCount, 0)`.
+1. **Ready to Pay count** — Sum of `PaymentCount` from all `PaymentStatusReport` rows where `Status.toLowerCase() === "reg"` (exact case-insensitive equality, per resolved BA-4). Example: `paymentStatusReport.filter(r => r.Status?.toLowerCase() === 'reg').reduce((sum, r) => sum + r.PaymentCount, 0)`.
 
 2. **Payments Made (Last 14 Days) — count** — Direct value from `TotalPaymentCountInLast14Days`.
 
 3. **Payments Made (Last 14 Days) — total value** — Sum of `TotalCommissionCount` from all `PaymentsByAgency` rows. Format with `formatCurrency` from Epic 1 (`lib/utils/currency.ts` or equivalent path). Example: `paymentsByAgency.reduce((sum, r) => sum + r.TotalCommissionCount, 0)`.
 
-4. **Parked count** — Sum of `PaymentCount` from all `PaymentStatusReport` rows where `Status` contains `"PARKED"`.
+4. **Parked count** — Sum of `PaymentCount` from all `PaymentStatusReport` rows where `Status.toLowerCase() === "parked"` (exact case-insensitive equality, consistent with the BA-4 rule).
 
 ### AgencyName Dropdown Population
 

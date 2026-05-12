@@ -7,6 +7,33 @@ import { expect } from 'vitest';
 
 expect.extend(matchers);
 
+// ---------------------------------------------------------------------------
+// Radix UI / Pointer Events polyfill for jsdom
+//
+// Radix UI Select (and other components using Pointer Events) call
+// target.hasPointerCapture(), target.setPointerCapture(), and
+// target.releasePointerCapture() which are not implemented in jsdom.
+// Without this polyfill, any user interaction with a Radix Select
+// component throws: TypeError: target.hasPointerCapture is not a function
+// ---------------------------------------------------------------------------
+if (typeof window !== 'undefined') {
+  if (!window.HTMLElement.prototype.hasPointerCapture) {
+    window.HTMLElement.prototype.hasPointerCapture = function () {
+      return false;
+    };
+  }
+  if (!window.HTMLElement.prototype.setPointerCapture) {
+    window.HTMLElement.prototype.setPointerCapture = function () {};
+  }
+  if (!window.HTMLElement.prototype.releasePointerCapture) {
+    window.HTMLElement.prototype.releasePointerCapture = function () {};
+  }
+  // Also needed by some Radix scroll/position calculations
+  if (!window.HTMLElement.prototype.scrollIntoView) {
+    window.HTMLElement.prototype.scrollIntoView = function () {};
+  }
+}
+
 // Polyfill for Web APIs needed by Next.js
 // These are required for testing files that import from 'next/server'
 if (typeof Request === 'undefined') {
