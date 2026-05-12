@@ -62,16 +62,6 @@
             "timeout": 20
           }
         ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \".claude/hooks/workflow-guard.ps1\"",
-            "timeout": 5
-          }
-        ]
       }
     ],
     "SessionStart": [

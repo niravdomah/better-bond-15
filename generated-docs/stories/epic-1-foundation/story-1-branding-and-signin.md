@@ -23,28 +23,28 @@
 
 ### Happy Path — Sign-In
 
-- [ ] AC-1: Given I visit the application as an unauthenticated user, when the page loads, then I am redirected to the sign-in page at `/auth/signin`.
-- [ ] AC-2: Given I am on the sign-in page, when the page loads, then I see MortgageMax branding — the page uses the navy primary color (`#1A3A6E`) as the dominant brand color (e.g., heading, button, or accent) and not the generic template grey or zinc palette.
-- [ ] AC-3: Given I am on the sign-in page, when the page loads, then I see a username/email input field and a password input field.
-- [ ] AC-4: Given I am on the sign-in page, when I enter the demo credentials (`admin@example.com` / `Admin123!`) and click the Sign In button, then I am redirected to the dashboard (home page `/`).
-- [ ] AC-5: Given I am signed in and on a protected page, when I visit `/auth/signin`, then I am redirected to the dashboard (already authenticated — no re-login required).
+- [x] AC-1: Given I visit the application as an unauthenticated user, when the page loads, then I am redirected to the sign-in page at `/auth/signin`.
+- [x] AC-2: Given I am on the sign-in page, when the page loads, then I see MortgageMax branding — the page uses the navy primary color (`#1A3A6E`) as the dominant brand color (e.g., heading, button, or accent) and not the generic template grey or zinc palette.
+- [x] AC-3: Given I am on the sign-in page, when the page loads, then I see a username/email input field and a password input field.
+- [x] AC-4: Given I am on the sign-in page, when I enter the demo credentials (`admin@example.com` / `Admin123!`) and click the Sign In button, then I am redirected to the dashboard (home page `/`).
+- [x] AC-5: Given I am signed in and on a protected page, when I visit `/auth/signin`, then I am redirected to the dashboard (already authenticated — no re-login required).
 
 ### Error Handling
 
-- [ ] AC-6: Given I am on the sign-in page, when I submit with an incorrect username or password, then I see an error message on the page (e.g., "Invalid credentials") and I remain on the sign-in page.
-- [ ] AC-7: Given I am on the sign-in page, when I submit with the email field empty, then the form prevents submission and the email field is highlighted as required.
-- [ ] AC-8: Given I am on the sign-in page, when I submit with the password field empty, then the form prevents submission and the password field is highlighted as required.
+- [x] AC-6: Given I am on the sign-in page, when I submit with an incorrect username or password, then I see an error message on the page (e.g., "Invalid credentials") and I remain on the sign-in page.
+- [x] AC-7: Given I am on the sign-in page, when I submit with the email field empty, then the form prevents submission and the email field is highlighted as required.
+- [x] AC-8: Given I am on the sign-in page, when I submit with the password field empty, then the form prevents submission and the password field is highlighted as required.
 
 ### FRS-Over-Template Replacements
 
-- [ ] AC-9: Given the application is running, when I inspect the next-auth credentials configuration, then there is exactly one demo user: `admin@example.com` with password `Admin123!` — the four template demo users (admin, power, standard, read-only) are removed.
-- [ ] AC-10: Given the application is running, when I navigate to `/auth/signup`, `/auth/signout`, or `/auth/forbidden`, then I receive a 404 — these routes are removed as they are out of scope for the POC.
-- [ ] AC-11: Given the application is running, when I inspect `types/roles.ts` and `lib/auth/auth.config.ts`, then the multi-role `UserRole` enum is replaced with a single `USER` role (or the role field is removed entirely from the session token) — the template 4-role model does not apply to this POC.
+- [x] AC-9: Given the application is running, when I inspect the next-auth credentials configuration, then there is exactly one demo user: `admin@example.com` with password `Admin123!` — the four template demo users (admin, power, standard, read-only) are removed.
+- [x] AC-10: Given the application is running, when I navigate to `/auth/signup`, `/auth/signout`, or `/auth/forbidden`, then I receive a 404 — these routes are removed as they are out of scope for the POC.
+- [x] AC-11: Given the application is running, when I inspect `types/roles.ts` and `lib/auth/auth.config.ts`, then the multi-role `UserRole` enum is replaced with a single `USER` role (or the role field is removed entirely from the session token) — the template 4-role model does not apply to this POC.
 
 ### Accessibility
 
-- [ ] AC-12: Given I am on the sign-in page, when I navigate using the keyboard (Tab key), then I can reach the email field, password field, and Sign In button in logical order, and each has a visible focus indicator.
-- [ ] AC-13: Given I am on the sign-in page, when an error message appears, then it is announced to screen readers (uses `role="alert"` or `aria-live="polite"`).
+- [x] AC-12: Given I am on the sign-in page, when I navigate using the keyboard (Tab key), then I can reach the email field, password field, and Sign In button in logical order, and each has a visible focus indicator.
+- [x] AC-13: Given I am on the sign-in page, when an error message appears, then it is announced to screen readers (uses `role="alert"` or `aria-live="polite"`).
 
 ## API Endpoints
 

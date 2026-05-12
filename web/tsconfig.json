@@ -19,7 +19,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "__vitest_axe_real__": ["./node_modules/vitest-axe/dist/index.d.ts"],
+      "vitest-axe/matchers": ["./node_modules/vitest-axe/dist/matchers.d.ts"],
+      "vitest-axe": ["./src/__mocks__/vitest-axe.ts"]
     },
     "types": ["vitest/globals"]
   },

@@ -51,7 +51,8 @@ export interface PaymentRead {
   Bank?: string;
   CommissionAmount?: number;
   VAT?: number;
-  Status?: string;
+  /** Post-normalisation contract: consumers always receive an object (see BA-4). */
+  Status?: { StatusCode: string; Description?: string };
   BatchId?: number;
 }
 

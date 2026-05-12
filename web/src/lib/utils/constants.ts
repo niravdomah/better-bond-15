@@ -15,10 +15,10 @@ export const API_BASE_URL =
 
 /**
  * Default pagination settings
- * Customize based on your application's needs
+ * FRS R8/R18 specifies 20 items per page for the payments list.
  */
 export const PAGINATION = {
-  DEFAULT_PAGE_SIZE: 25,
+  DEFAULT_PAGE_SIZE: 20,
   PAGE_SIZE_OPTIONS: [10, 25, 50, 100],
 } as const;
 

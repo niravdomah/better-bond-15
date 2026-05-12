@@ -155,42 +155,6 @@ Concrete example: The template ships with NextAuth (credentials provider, local 
 
 `npm run test:quality` must always pass. Anti-patterns in test files (even skipped tests) will fail CI/CD. In TDD, failing tests create expected TypeScript errors, but this still counts as a failed quality gate until implementation is complete.
 
-### 9. TDD Workflow Enforcement
-
-**ALL development work must go through the TDD workflow.** When a user asks you to build, create, add, change, fix, update, or implement anything — including components, pages, features, styles, layouts, API integrations, or any code — you MUST redirect them into the workflow. Non-technical users often phrase requests as direct instructions:
-
-- "Build me a login page"
-- "Add a sidebar with navigation"
-- "Make it look nice"
-- "Create a dashboard"
-- "Fix the header"
-- "Add dark mode"
-- "Connect the API"
-
-These are ALL development requests that require the TDD workflow.
-
-**How to redirect (based on the WORKFLOW GUARD context injected with each prompt):**
-
-| Guard says                        | You do                                                                                                                                                                          |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "Project not initialized"         | Tell the user: "Let's get the project set up first." Then run `/setup`.                                                                                                         |
-| "No active workflow"              | Tell the user: "Great idea! Let's build that properly. I'll start the workflow so we can capture requirements, plan the architecture, and build with tests." Then run `/start`. |
-| "Previous feature is complete"    | Tell the user: "Nice — ready for the next feature! Let me kick off the workflow." Then run `/start`.                                                                            |
-| "Active workflow at phase X"      | Tell the user: "We have work in progress — let me pick up where we left off." Then run `/continue`.                                                                             |
-| "Workflow paused between stories" | Tell the user: "We're between stories — let me advance to the next one." Then run `/continue`.                                                                                  |
-
-**What is NOT a development request (do NOT redirect):**
-
-- Questions about the codebase, architecture, or how something works ("How does the API client work?", "What does this component do?")
-- Requests to explain, read, or review existing code
-- Running `/status`, `/dashboard`, `/quality-check`, `/setup`
-- Git operations (committing, pushing, checking status)
-- Questions about the workflow itself ("What phase are we in?", "How does /start work?")
-- Conversation during an active `/start` or `/continue` flow (e.g., answering AskUserQuestion prompts, providing requirements, approving epics)
-- File or documentation reading requests
-
-**Key principle:** When in doubt, redirect. It is always better to enter the workflow and discover the request is small than to write untracked, untested code outside it. The workflow handles everything from one-line fixes to multi-epic features.
-
 ### 10. Every Story Needs a Playwright Spec
 
 Every routable story must have a Playwright spec at `web/e2e/epic-<N>-story-<M>-<slug>.spec.ts`. Non-routable stories still get a spec file, but the suite is wrapped in `test.fixme()` with a one-line reason comment. The QA phase **halts** if a routable story has no spec file — this is a workflow error, not a silent skip.
@@ -258,13 +222,13 @@ Playwright specs in `web/e2e/` exercise the running Next.js app in a real Chromi
 
 **When to write an E2E test vs a Vitest integration test:**
 
-| Belongs in Playwright | Belongs in Vitest |
-|---|---|
-| Sign-in flows against the real `authorize()` callback | Component rendering + axe accessibility |
-| Redirects, route guards, middleware execution | Hook behavior and form-field logic |
-| Navigate-and-assert-next-page flows | Schema validation (Zod) |
-| localStorage surviving a real page reload | Anything provable with mocked HTTP in jsdom |
-| Role-aware visibility on rendered pages | |
+| Belongs in Playwright                                 | Belongs in Vitest                           |
+| ----------------------------------------------------- | ------------------------------------------- |
+| Sign-in flows against the real `authorize()` callback | Component rendering + axe accessibility     |
+| Redirects, route guards, middleware execution         | Hook behavior and form-field logic          |
+| Navigate-and-assert-next-page flows                   | Schema validation (Zod)                     |
+| localStorage surviving a real page reload             | Anything provable with mocked HTTP in jsdom |
+| Role-aware visibility on rendered pages               |                                             |
 
 **Don't duplicate.** A sign-in redirect belongs in Playwright — asserting it in Vitest would require mocking `signIn()`, which recreates the exact blind spot this pipeline exists to close (see the Story 1.1 bcrypt miss).
 

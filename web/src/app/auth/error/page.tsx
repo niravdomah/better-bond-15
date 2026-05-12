@@ -32,7 +32,7 @@ function AuthErrorContent(): React.ReactElement {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
+    <div className="flex min-h-screen items-center justify-center bg-background">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Authentication Error</CardTitle>

@@ -1,36 +1,35 @@
 /**
- * NextAuth Type Extensions
+ * NextAuth Type Extensions — MortgageMax Commission Payments POC
  *
- * This file extends NextAuth's default types to include custom fields
- * like user roles. TypeScript will automatically pick up these declarations.
+ * Single-role POC: the session carries { user: { id, email, name } }.
+ * No role field is required (AC-11, FRS NFR3).
  */
 
 import { DefaultSession, DefaultUser } from 'next-auth';
 import { DefaultJWT } from 'next-auth/jwt';
 
-import { UserRole } from './roles';
-
 /**
- * Extend the Session user object to include role
+ * Extend the Session user object to include id.
+ * No role field — single-role POC (AC-11).
  */
 declare module 'next-auth' {
   interface Session {
     user: {
       id: string;
-      role: UserRole;
     } & DefaultSession['user'];
   }
 
   interface User extends DefaultUser {
-    role: UserRole;
+    id: string;
   }
 }
 
 /**
- * Extend the JWT token to include role
+ * Extend the JWT token to include id.
+ * No role field — single-role POC.
  */
 declare module 'next-auth/jwt' {
   interface JWT extends DefaultJWT {
-    role: UserRole;
+    id?: string;
   }
 }

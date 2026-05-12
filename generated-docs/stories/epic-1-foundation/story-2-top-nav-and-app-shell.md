@@ -23,32 +23,32 @@
 
 ### Navigation Links
 
-- [ ] AC-1: Given I am signed in and on any protected page, when the page loads, then I see a top navigation bar containing three links: "Dashboard", "Payment Management", and "Payments Made".
-- [ ] AC-2: Given I am signed in and on the Dashboard stub page (`/`), when the page loads, then the "Dashboard" navigation link is visually highlighted as the active route (e.g., different color, underline, or background) and the other two links are not highlighted.
-- [ ] AC-3: Given I am signed in and on the Payment Management stub page (`/payment-management`), when the page loads, then the "Payment Management" navigation link is visually highlighted and the other two are not.
-- [ ] AC-4: Given I am signed in and on the Payments Made stub page (`/payments-made`), when the page loads, then the "Payments Made" navigation link is visually highlighted and the other two are not.
-- [ ] AC-5: Given I am on the Dashboard stub page, when I click the "Payment Management" link, then I navigate to `/payment-management`.
-- [ ] AC-6: Given I am on the Dashboard stub page, when I click the "Payments Made" link, then I navigate to `/payments-made`.
+- [x] AC-1: Given I am signed in and on any protected page, when the page loads, then I see a top navigation bar containing three links: "Dashboard", "Payment Management", and "Payments Made".
+- [x] AC-2: Given I am signed in and on the Dashboard stub page (`/`), when the page loads, then the "Dashboard" navigation link is visually highlighted as the active route (e.g., different color, underline, or background) and the other two links are not highlighted.
+- [x] AC-3: Given I am signed in and on the Payment Management stub page (`/payment-management`), when the page loads, then the "Payment Management" navigation link is visually highlighted and the other two are not.
+- [x] AC-4: Given I am signed in and on the Payments Made stub page (`/payments-made`), when the page loads, then the "Payments Made" navigation link is visually highlighted and the other two are not.
+- [x] AC-5: Given I am on the Dashboard stub page, when I click the "Payment Management" link, then I navigate to `/payment-management`.
+- [x] AC-6: Given I am on the Dashboard stub page, when I click the "Payments Made" link, then I navigate to `/payments-made`.
 
 ### MortgageMax Branding
 
-- [ ] AC-7: Given I am signed in and on any protected page, when the page loads, then the navigation bar displays MortgageMax branding — the nav background or top accent uses navy `#1A3A6E` and the application is light mode only (no dark mode classes active).
-- [ ] AC-8: Given I am signed in, when the page loads, then the MortgageMax logo or wordmark is visible in the top navigation bar.
+- [x] AC-7: Given I am signed in and on any protected page, when the page loads, then the navigation bar displays MortgageMax branding — the nav background or top accent uses navy `#1A3A6E` and the application is light mode only (no dark mode classes active).
+- [x] AC-8: Given I am signed in, when the page loads, then the MortgageMax logo or wordmark is visible in the top navigation bar.
 
 ### Toast Notifications (Shadcn Sonner)
 
-- [ ] AC-9: Given the application is running, when I inspect the layout, then toast notifications are powered by Shadcn Sonner (`<Toaster />` from `sonner`) — the custom `Toast.tsx` / `ToastContainer.tsx` / `ToastContext` from the template are removed.
-- [ ] AC-10: Given a toast notification is triggered (e.g., by a test action), when the toast appears, then it is visible on screen, auto-dismisses after approximately 5 seconds, and can be manually dismissed by clicking it.
+- [x] AC-9: Given the application is running, when I inspect the layout, then toast notifications are powered by Shadcn Sonner (`<Toaster />` from `sonner`) — the custom `Toast.tsx` / `ToastContainer.tsx` / `ToastContext` from the template are removed.
+- [x] AC-10: Given a toast notification is triggered (e.g., by a test action), when the toast appears, then it is visible on screen, auto-dismisses after approximately 5 seconds, and can be manually dismissed by clicking it.
 
 ### Responsive Layout
 
-- [ ] AC-11: Given I am on a desktop screen (1280px wide), when the page loads, then the navigation bar shows all three links in a horizontal row.
-- [ ] AC-12: Given I am on a mobile screen (375px wide), when the page loads, then the navigation bar collapses to a mobile-friendly layout (e.g., hamburger menu or stacked links) — the links remain accessible and functional.
+- [x] AC-11: Given I am on a desktop screen (1280px wide), when the page loads, then the navigation bar shows all three links in a horizontal row.
+- [x] AC-12: Given I am on a mobile screen (375px wide), when the page loads, then the navigation bar collapses to a mobile-friendly layout (e.g., hamburger menu or stacked links) — the links remain accessible and functional.
 
 ### Accessibility
 
-- [ ] AC-13: Given I am on any protected page, when I navigate using the keyboard (Tab key), then I can reach each navigation link in logical order and each link has a visible focus indicator.
-- [ ] AC-14: Given I am on any protected page, when a screen reader reads the navigation, then the nav landmark is identified (uses `<nav>` element or `role="navigation"`) and the active link is indicated (e.g., `aria-current="page"`).
+- [x] AC-13: Given I am on any protected page, when I navigate using the keyboard (Tab key), then I can reach each navigation link in logical order and each link has a visible focus indicator.
+- [x] AC-14: Given I am on any protected page, when a screen reader reads the navigation, then the nav landmark is identified (uses `<nav>` element or `role="navigation"`) and the active link is indicated (e.g., `aria-current="page"`).
 
 ## API Endpoints
 

@@ -1,69 +1,38 @@
 /**
- * User Role Definitions
+ * User Role Definitions — MortgageMax Commission Payments POC
  *
- * IMPORTANT: These are example roles for demonstration purposes.
- * Each application should define its own roles based on business requirements.
- *
- * To customize for your project:
- * 1. Update the UserRole enum with your application's specific roles
- * 2. Update the ROLE_HIERARCHY object to define permission levels
- * 3. Update the roleDescriptions with meaningful descriptions
- * 4. Consider role-to-permission mappings for fine-grained access control
+ * This POC uses a single authenticated role (FRS NFR3).
+ * All authenticated users share identical permissions.
+ * The multi-role model (ADMIN / POWER_USER / STANDARD_USER / READ_ONLY) from
+ * the template has been replaced — AC-11.
  */
 
-/**
- * Example role enum pattern.
- * Replace these with your application's specific roles.
- */
 export enum UserRole {
   /**
-   * Full system access - can manage users, configurations, and all resources
+   * Single authenticated role for this POC.
+   * All payment administrators use this role.
    */
-  ADMIN = 'admin',
-
-  /**
-   * Advanced features and bulk operations - can manage resources within their scope
-   */
-  POWER_USER = 'power_user',
-
-  /**
-   * Standard access - can create, edit, and delete own resources
-   */
-  STANDARD_USER = 'standard_user',
-
-  /**
-   * View-only access - can only read data, cannot make changes
-   */
-  READ_ONLY = 'read_only',
+  USER = 'user',
 }
 
 /**
- * Role hierarchy defines the privilege level of each role.
- * Higher numbers indicate greater privilege.
- * Used for "at least" permission checks (e.g., "requires power user or higher").
+ * Role hierarchy — single role, no differentiation needed.
  */
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
-  [UserRole.ADMIN]: 100,
-  [UserRole.POWER_USER]: 50,
-  [UserRole.STANDARD_USER]: 25,
-  [UserRole.READ_ONLY]: 10,
+  [UserRole.USER]: 10,
 };
 
 /**
- * Human-readable role descriptions for UI display
+ * Human-readable role descriptions
  */
 export const roleDescriptions: Record<UserRole, string> = {
-  [UserRole.ADMIN]: 'Full system access',
-  [UserRole.POWER_USER]: 'Advanced features and bulk operations',
-  [UserRole.STANDARD_USER]: 'Standard user access',
-  [UserRole.READ_ONLY]: 'View-only access',
+  [UserRole.USER]: 'Payment Administrator',
 };
 
 /**
- * Default role assigned to new users if not specified.
- * Customize based on your application's security requirements.
+ * Default role — only one role exists in this POC.
  */
-export const DEFAULT_ROLE = UserRole.STANDARD_USER;
+export const DEFAULT_ROLE = UserRole.USER;
 
 /**
  * Type guard to check if a string is a valid UserRole

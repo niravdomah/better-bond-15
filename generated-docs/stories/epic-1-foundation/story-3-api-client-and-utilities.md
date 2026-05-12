@@ -23,42 +23,42 @@
 
 ### API Client Base Configuration
 
-- [ ] AC-1: Given the application is running, when any API call is made, then it targets `http://localhost:8042` (verified via `NEXT_PUBLIC_API_BASE_URL` defaulting to `http://localhost:8042` in `lib/utils/constants.ts`) — no Next.js rewrite proxy is configured.
-- [ ] AC-2: Given the application is running, when I inspect the Next.js config (`next.config.ts` or `next.config.js`), then there are no `rewrites()` rules that proxy `/api/*` or `/v1/*` to the backend — direct browser calls are the pattern per NFR5.
-- [ ] AC-3: Given the API client is called for any mutation endpoint (`PUT /v1/payments/park`, `PUT /v1/payments/unpark`, `POST /v1/payment-batches`), when the call succeeds, then the response is parsed and returned correctly by the existing `apiClient` base function.
-- [ ] AC-4: Given `POST /v1/payment-batches` is called, when the `lastChangedUser` option is provided to the endpoint function, then the `LastChangedUser` header is included in the HTTP request (the existing `buildHeaders` function already handles this — verified by test).
+- [x] AC-1: Given the application is running, when any API call is made, then it targets `http://localhost:8042` (verified via `NEXT_PUBLIC_API_BASE_URL` defaulting to `http://localhost:8042` in `lib/utils/constants.ts`) — no Next.js rewrite proxy is configured.
+- [x] AC-2: Given the application is running, when I inspect the Next.js config (`next.config.ts` or `next.config.js`), then there are no `rewrites()` rules that proxy `/api/*` or `/v1/*` to the backend — direct browser calls are the pattern per NFR5.
+- [x] AC-3: Given the API client is called for any mutation endpoint (`PUT /v1/payments/park`, `PUT /v1/payments/unpark`, `POST /v1/payment-batches`), when the call succeeds, then the response is parsed and returned correctly by the existing `apiClient` base function.
+- [x] AC-4: Given `POST /v1/payment-batches` is called, when the `lastChangedUser` option is provided to the endpoint function, then the `LastChangedUser` header is included in the HTTP request (the existing `buildHeaders` function already handles this — verified by test).
 
 ### Endpoint Functions
 
-- [ ] AC-5: Given the `lib/api/endpoints.ts` file exists, when I import `getDashboard`, then calling it makes a `GET /v1/payments/dashboard` request and returns a typed `PaymentsDashboard` object.
-- [ ] AC-6: Given the `lib/api/endpoints.ts` file exists, when I import `getPayments`, then calling it makes a `GET /v1/payments` request and returns a typed `Payment[]` array.
-- [ ] AC-7: Given the `lib/api/endpoints.ts` file exists, when I import `parkPayments`, then calling it with an array of payment IDs makes a `PUT /v1/payments/park` request with the IDs in the request body.
-- [ ] AC-8: Given the `lib/api/endpoints.ts` file exists, when I import `unparkPayments`, then calling it with an array of payment IDs makes a `PUT /v1/payments/unpark` request with the IDs in the request body.
-- [ ] AC-9: Given the `lib/api/endpoints.ts` file exists, when I import `createPaymentBatch`, then calling it with `PaymentIds` and `lastChangedUser` makes a `POST /v1/payment-batches` request with the `LastChangedUser` header and `{ PaymentIds: [...] }` body.
-- [ ] AC-10: Given the `lib/api/endpoints.ts` file exists, when I import `getPaymentBatches`, then calling it makes a `GET /v1/payment-batches` request and returns a typed `PaymentBatch[]` array.
-- [ ] AC-11: Given the `lib/api/endpoints.ts` file exists, when I import `downloadInvoicePdf`, then calling it with a batch ID makes a `POST /v1/payment-batches/{Id}/download-invoice-pdf` request and returns a `Blob`.
-- [ ] AC-12: Given the `lib/api/endpoints.ts` file exists, when I import `resetDemoData`, then calling it makes a `POST /demo/reset-demo` request.
+- [x] AC-5: Given the `lib/api/endpoints.ts` file exists, when I import `getDashboard`, then calling it makes a `GET /v1/payments/dashboard` request and returns a typed `PaymentsDashboard` object.
+- [x] AC-6: Given the `lib/api/endpoints.ts` file exists, when I import `getPayments`, then calling it makes a `GET /v1/payments` request and returns a typed `Payment[]` array.
+- [x] AC-7: Given the `lib/api/endpoints.ts` file exists, when I import `parkPayments`, then calling it with an array of payment IDs makes a `PUT /v1/payments/park` request with the IDs in the request body.
+- [x] AC-8: Given the `lib/api/endpoints.ts` file exists, when I import `unparkPayments`, then calling it with an array of payment IDs makes a `PUT /v1/payments/unpark` request with the IDs in the request body.
+- [x] AC-9: Given the `lib/api/endpoints.ts` file exists, when I import `createPaymentBatch`, then calling it with `PaymentIds` and `lastChangedUser` makes a `POST /v1/payment-batches` request with the `LastChangedUser` header and `{ PaymentIds: [...] }` body.
+- [x] AC-10: Given the `lib/api/endpoints.ts` file exists, when I import `getPaymentBatches`, then calling it makes a `GET /v1/payment-batches` request and returns a typed `PaymentBatch[]` array.
+- [x] AC-11: Given the `lib/api/endpoints.ts` file exists, when I import `downloadInvoicePdf`, then calling it with a batch ID makes a `POST /v1/payment-batches/{Id}/download-invoice-pdf` request and returns a `Blob`.
+- [x] AC-12: Given the `lib/api/endpoints.ts` file exists, when I import `resetDemoData`, then calling it makes a `POST /demo/reset-demo` request.
 
 ### TypeScript Types
 
-- [ ] AC-13: Given `types/api-generated.ts` exists, when I import `PaymentsDashboard`, then it has the fields: `PaymentStatusReport` (array of `PaymentStatusReportItem`), `ParkedPaymentsAgingReport` (array of `ParkedPaymentsAgingReportItem`), `TotalPaymentCountInLast14Days` (number), `PaymentsByAgency` (array of `PaymentsByAgencyReportItem`).
-- [ ] AC-14: Given `types/api-generated.ts` exists, when I import `Payment`, then it has the fields: `Id`, `Reference`, `AgencyName`, `AgentName`, `AgentSurname`, `ClaimDate`, `BondAmount`, `CommissionType`, `CommissionAmount`, `VAT`, `Status` (object containing `StatusCode` string), `GrantDate`, `RegistrationDate`, `Bank`, `LastChangedUser`, `LastChangedDate`, `BatchId` — and does NOT include `CommissionPercent`.
-- [ ] AC-15: Given `types/api-generated.ts` exists, when I import `PaymentBatch`, then it has the fields: `Id`, `Reference`, `CreatedDate`, `Status`, `AgencyName`, `PaymentCount`, `TotalCommissionAmount`, `TotalVat`, `LastChangedUser`.
-- [ ] AC-16: Given `types/api-generated.ts` exists, when the TypeScript compiler runs (`npm --prefix web run build`), then there are no type errors related to these new types.
+- [x] AC-13: Given `types/api-generated.ts` exists, when I import `PaymentsDashboard`, then it has the fields: `PaymentStatusReport` (array of `PaymentStatusReportItem`), `ParkedPaymentsAgingReport` (array of `ParkedPaymentsAgingReportItem`), `TotalPaymentCountInLast14Days` (number), `PaymentsByAgency` (array of `PaymentsByAgencyReportItem`).
+- [x] AC-14: Given `types/api-generated.ts` exists, when I import `Payment`, then it has the fields: `Id`, `Reference`, `AgencyName`, `AgentName`, `AgentSurname`, `ClaimDate`, `BondAmount`, `CommissionType`, `CommissionAmount`, `VAT`, `Status` (object containing `StatusCode` string), `GrantDate`, `RegistrationDate`, `Bank`, `LastChangedUser`, `LastChangedDate`, `BatchId` — and does NOT include `CommissionPercent`.
+- [x] AC-15: Given `types/api-generated.ts` exists, when I import `PaymentBatch`, then it has the fields: `Id`, `Reference`, `CreatedDate`, `Status`, `AgencyName`, `PaymentCount`, `TotalCommissionAmount`, `TotalVat`, `LastChangedUser`.
+- [x] AC-16: Given `types/api-generated.ts` exists, when the TypeScript compiler runs (`npm --prefix web run build`), then there are no type errors related to these new types.
 
 ### Currency Formatting Utility
 
-- [ ] AC-17: Given `lib/utils/format.ts` exports `formatCurrency`, when called with `1234567.89`, then it returns the string `"R 1,234,567.89"` (R prefix, space, US-style thousand separator comma, period decimal separator — per BR9).
-- [ ] AC-18: Given `lib/utils/format.ts` exports `formatCurrency`, when called with `0`, then it returns `"R 0.00"`.
-- [ ] AC-19: Given `lib/utils/format.ts` exports `formatCurrency`, when called with `1000`, then it returns `"R 1,000.00"`.
+- [x] AC-17: Given `lib/utils/format.ts` exports `formatCurrency`, when called with `1234567.89`, then it returns the string `"R 1,234,567.89"` (R prefix, space, US-style thousand separator comma, period decimal separator — per BR9).
+- [x] AC-18: Given `lib/utils/format.ts` exports `formatCurrency`, when called with `0`, then it returns `"R 0.00"`.
+- [x] AC-19: Given `lib/utils/format.ts` exports `formatCurrency`, when called with `1000`, then it returns `"R 1,000.00"`.
 
 ### Date Formatting Utility
 
-- [ ] AC-20: Given `lib/utils/format.ts` exports `formatDate`, when called with an ISO date string (e.g., `"2024-03-15T00:00:00"`), then it returns a human-readable date string (e.g., `"15 Mar 2024"` or `"2024-03-15"` — the exact format must be documented in the implementation notes and used consistently throughout Epics 2–4).
+- [x] AC-20: Given `lib/utils/format.ts` exports `formatDate`, when called with an ISO date string (e.g., `"2024-03-15T00:00:00"`), then it returns a human-readable date string (e.g., `"15 Mar 2024"` or `"2024-03-15"` — the exact format must be documented in the implementation notes and used consistently throughout Epics 2–4).
 
 ### Smoke Test
 
-- [ ] AC-21: Given the backend is running at `http://localhost:8042`, when the Vitest test suite runs the smoke-test spec for `getDashboard()`, then the call resolves without error and the response has the expected shape (non-null `PaymentStatusReport` array).
+- [x] AC-21: Given the backend is running at `http://localhost:8042`, when the Vitest test suite runs the smoke-test spec for `getDashboard()`, then the call resolves without error and the response has the expected shape (non-null `PaymentStatusReport` array).
 
 ## API Endpoints (from OpenAPI spec at `generated-docs/specs/api-spec.yaml`)
 

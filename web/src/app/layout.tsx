@@ -1,14 +1,12 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { ToastProvider } from '@/contexts/ToastContext';
-import { ToastContainer } from '@/components/toast/ToastContainer';
+import { Toaster } from '@/components/ui/sonner';
 import { SessionProvider } from '@/components/auth/session-provider';
-import { auth } from '@/lib/auth/auth';
+import { getSession } from '@/lib/auth/auth-server';
 
 export const metadata: Metadata = {
-  title: 'Next.js Application Template',
-  description:
-    'A template for building Next.js applications with external REST APIs',
+  title: 'MortgageMax Payments',
+  description: 'BetterBond Commission Payments — MortgageMax',
 };
 
 export default async function RootLayout({
@@ -16,18 +14,19 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth();
+  // Use getSession() rather than auth() directly so that JWTSessionError
+  // (stale cookie encrypted with a different secret) is handled gracefully —
+  // the user is treated as unauthenticated instead of receiving a 500.
+  const session = await getSession();
 
   return (
     <html lang="en">
       <body className="antialiased">
         <SessionProvider session={session}>
-          <ToastProvider>
-            <div className="min-h-screen flex flex-col">
-              <main className="flex-1">{children}</main>
-            </div>
-            <ToastContainer />
-          </ToastProvider>
+          <div className="min-h-screen flex flex-col">
+            <main className="flex-1">{children}</main>
+          </div>
+          <Toaster duration={5000} />
         </SessionProvider>
       </body>
     </html>
