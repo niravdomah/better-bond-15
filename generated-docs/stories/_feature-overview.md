@@ -38,3 +38,9 @@ Epics 2, 3, and 4 can technically run in parallel after Epic 1 completes, but se
 | 1.1 | MortgageMax Branding and Sign-In Page | `epic-1-foundation/story-1-branding-and-signin.md` | Pending |
 | 1.2 | Top Navigation Bar and App Shell | `epic-1-foundation/story-2-top-nav-and-app-shell.md` | Pending |
 | 1.3 | API Client Configuration and Utilities | `epic-1-foundation/story-3-api-client-and-utilities.md` | Pending |
+
+## Epic 2 Stories
+
+| Story | Title | File | Status |
+|-------|-------|------|--------|
+| 2.1 | Dashboard Page with Metric Cards and Report Grids | `epic-2-dashboard/story-1-dashboard-page.md` | Pending |
