@@ -1,2 +1,5 @@
-# Secret scan — runs on staged files before anything else
-bash .github/scripts/scan-secrets.sh --staged && cd web && npx tsc --noEmit && npx lint-staged
+# Delegates to the canonical pre-commit check script so the actual hook
+# and the code-reviewer Call B gate stay in sync (see Item 4 of the
+# speed-optimization plan at C:\Users\User\.claude\plans\).
+# To bypass in an emergency: git commit --no-verify (not recommended).
+node ../.claude/scripts/run-pre-commit-checks.js --mode=staged

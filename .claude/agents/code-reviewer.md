@@ -460,6 +460,21 @@ Two tests are also failing in epic-1-story-2. Want me to take a look at these?
 
 Do NOT proceed to manual verification if automated gates fail.
 
+### Step 3: Pre-Commit Readiness Check (mandatory before Manual Verification)
+
+Run the canonical pre-commit script in working-tree mode. This catches every check the actual git pre-commit hook will run later (secret scan, `tsc --noEmit`, lint-staged equivalents), so a failure here is fixed inside the fix cycle rather than during Call C's commit.
+
+```bash
+node .claude/scripts/run-pre-commit-checks.js --mode=working-tree
+```
+
+Parse the JSON output. If `status: "ok"`, log a one-line confirmation ("Pre-commit readiness check passed.") and continue to manual verification. If `status: "fail"`, surface the failed step and the captured stderr — this is a Call B failure that must go back to fix cycle. **Do NOT proceed to manual verification when this script fails.** The intent is to keep Call C deterministic: by the time Call C runs, the pre-commit hook should have nothing left to complain about.
+
+Common failure modes and where the fix lives:
+- `failed: "secret-scan"` → A staged file contains a secret-like literal. Move it to `.env.local`, or add `# scan-secrets-ignore` if it's a recognised test fixture per the scanner's docs.
+- `failed: "tsc-noemit"` → Type errors that the build gate may have skipped (e.g., test-only imports). The fix-cycle developer needs to resolve them.
+- `failed: "lint-format"` → Re-run `npm --prefix web run lint:fix` and `npx prettier --write` on the offending files.
+
 ---
 
 ## Part 3: Manual Verification
@@ -664,6 +679,24 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 EOF
 )"
 ```
+
+#### Pre-commit hook failures during Call C — DO NOT iterate
+
+By design, Call B's "Pre-Commit Readiness Check" (`run-pre-commit-checks.js --mode=working-tree`) is the last place hook failures should surface. By the time Call C runs `git commit`, the pre-commit hook should have nothing left to flag.
+
+**If the commit fails because of a pre-commit hook**, this is a Call B miss — not something Call C should patch over.
+
+- DO NOT loop on `git commit` trying different file sets.
+- DO NOT auto-fix hook output and retry.
+- DO NOT use `--no-verify` to bypass the hook.
+
+Instead:
+1. Capture the hook's stderr (first ~80 lines).
+2. Unstage with `git reset HEAD --` to leave the working tree untouched.
+3. Return a structured failure to the orchestrator: which hook failed, what the stderr said, and a one-line hypothesis for why Call B didn't catch it (e.g., "Call B's working-tree scan checked file X, but `git add` picked up auto-generated file Y that wasn't yet in the working tree at Call B time").
+4. The orchestrator routes this back to fix cycle for the affected story.
+
+This keeps Call C deterministic — it commits or halts, no LLM iteration. Hook failures are root-caused at Call B and remembered for next time, not papered over at commit time.
 
 ### Step 4: Push to Remote
 

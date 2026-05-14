@@ -733,11 +733,23 @@ The FRS (`generated-docs/specs/feature-requirements.md`) and story acceptance cr
 - After INTAKE phase completes (FRS and manifest produced)
 - After SCOPE phase completes (epics defined)
 - After STORIES phase completes for each epic
-- After each story's QA phase passes (commit includes tests + implementation)
+- After each epic's QA phase passes (single commit includes all stories' tests + implementation)
 - After creating multiple files (e.g., after every 2-3 wireframes)
 - Before handing off to another agent
 
-Each story is committed AFTER its QA phase passes, not after IMPLEMENT.
+The epic commit happens AFTER EPIC-QA passes, not after IMPLEMENT.
+
+### Call C is deterministic — pre-commit hook failures HALT, do not iterate
+
+Call B is the last gate where pre-commit hook failures can be discovered cheaply. It runs [run-pre-commit-checks.js --mode=working-tree](../scripts/run-pre-commit-checks.js), which executes the EXACT same checks the actual `.husky/pre-commit` hook will run later (secret scan, `tsc --noEmit`, lint-staged). Any failure here goes back to fix cycle.
+
+By the time Call C runs `git commit`, the pre-commit hook should have nothing left to flag. If it DOES fail at Call C:
+
+1. **Do NOT loop on the commit.** Don't try different file sets, auto-fix the hook output, or pass `--no-verify`.
+2. **Capture the failure** (which hook, first ~80 lines of stderr) and **halt**.
+3. The orchestrator surfaces the failure as a fix-cycle entry on the story whose file caused the miss.
+
+The intent: every hook failure is root-caused at Call B (where the fix is cheap) instead of Call C (where the agent burns 50+ tool calls iterating). If Call C catches a hook failure that Call B missed, that's evidence Call B's check set has drifted from `.husky/pre-commit` — investigate and re-sync [run-pre-commit-checks.js](../scripts/run-pre-commit-checks.js) with the actual hook.
 
 ### Commit Message Format (Conventional Commits)
 
