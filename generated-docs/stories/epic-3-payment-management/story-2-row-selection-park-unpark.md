@@ -128,7 +128,15 @@ The Shadcn `Checkbox` component supports `checked={true | false | "indeterminate
 
 ### Park/Unpark API Calls
 
-Use `put` from `@/lib/api/client`. Request body: `{ PaymentIds: [...selectedIds] }`. Both endpoints return `200` on success with no meaningful body. On non-2xx, display the failure toast (R16, BR6 does not apply on failure — keep selections so the user can retry).
+Use `parkPayments(ids)` and `unparkPayments(ids)` from `@/lib/api/endpoints` — these are already implemented and wrap `PUT /v1/payments/park` and `PUT /v1/payments/unpark` respectively. Do not call `put()` directly from `@/lib/api/client`. Both endpoints return `200` on success with no meaningful body. On non-2xx, display the failure toast (R16, BR6 does not apply on failure — keep selections so the user can retry).
+
+### Shared Utilities
+
+Any column rendering touched by this story uses `formatCurrency` / `formatDate` from `@/lib/utils/format` (consistent with Story 3.1).
+
+### Data Types
+
+`getPayments()` from `@/lib/api/endpoints` returns `NormalisedPaymentRead[]`, where `Status` is `{ StatusCode: string }` (not a plain string — see BA-4 normalisation in `endpoints.ts`). Use `payment.Status?.StatusCode` when reading the status value.
 
 ### Post-Mutation Refresh
 
@@ -137,13 +145,15 @@ After a successful park or unpark:
 2. Set a loading state on the grid (or the action button spinner)
 3. Re-fetch `GET /v1/payments`
 4. Update the payments state with the fresh list
-5. Reset pagination to page 1 (the data has changed so the current page index may be stale)
+5. Reset pagination to page 1 (the data has changed so the current page index may be stale). Use `PAGINATION.DEFAULT_PAGE_SIZE` from `@/lib/utils/constants` for any page-size calculations, consistent with Story 3.1.
 
 ### Shadcn Components to Use
 
 - `Checkbox` — per-row and header checkboxes (supports indeterminate)
 - `Button` — Park and Unpark action buttons (use `disabled` prop when no rows selected)
-- Sonner `toast` — success and failure notifications (auto-dismiss via `duration: 5000`)
+- Sonner `toast` — success and failure notifications
+
+The `<Toaster duration={5000} />` is already registered globally in `app/layout.tsx`, so the 5-second auto-dismiss in AC-23 is satisfied without passing `duration` on each `toast.success()` / `toast.error()` call. For differentiated durations, use `TOAST_SETTINGS.SUCCESS_DURATION` (3000ms) or `TOAST_SETTINGS.ERROR_DURATION` (7000ms) from `@/lib/utils/constants` as an explicit `{ duration: ... }` override.
 
 Install any missing Shadcn components via MCP before use.
 

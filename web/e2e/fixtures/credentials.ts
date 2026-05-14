@@ -5,7 +5,7 @@ export type SeededUser = {
 };
 
 export const adminUser: SeededUser = {
-  email: 'alice.admin@betterbond.example',
+  email: 'admin@example.com', // scan-secrets-ignore - documented POC seed credential (matches auth.config.ts)
   password: 'Admin123!', // scan-secrets-ignore - documented POC seed credential (matches auth.config.ts)
   role: 'admin',
 };

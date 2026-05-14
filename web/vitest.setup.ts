@@ -3,9 +3,18 @@ import '@testing-library/jest-dom/vitest';
 
 // Accessibility testing with axe-core
 import * as matchers from 'vitest-axe/matchers';
-import { expect } from 'vitest';
+import { expect, afterEach, vi } from 'vitest';
 
 expect.extend(matchers);
+
+// ---------------------------------------------------------------------------
+// Global timer cleanup — ensures vi.useFakeTimers() in one test does not
+// bleed into subsequent tests if the test fails before calling
+// vi.useRealTimers(). Runs after every test in every file.
+// ---------------------------------------------------------------------------
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 // ---------------------------------------------------------------------------
 // Radix UI / Pointer Events polyfill for jsdom

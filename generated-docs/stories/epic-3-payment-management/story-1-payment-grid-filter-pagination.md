@@ -31,52 +31,52 @@ dependsOn: []
 
 ### Data Fetch — Happy Path
 
-- [ ] AC-2: Given I am authenticated, when the Payment Management page loads, then the frontend calls `GET /v1/payments` exactly once on mount and displays the returned data.
-- [ ] AC-3: Given the API responds with data, when the page renders, then the payment grid is visible with rows populated from the `PaymentList` array.
+- [x] AC-2: Given I am authenticated, when the Payment Management page loads, then the frontend calls `GET /v1/payments` exactly once on mount and displays the returned data.
+- [x] AC-3: Given the API responds with data, when the page renders, then the payment grid is visible with rows populated from the `PaymentList` array.
 
 ### Grid Columns
 
-- [ ] AC-4: Given the API has returned data, when I view the payment grid, then I see exactly these 13 columns in order: Reference, AgencyName, AgentName, AgentSurname, ClaimDate, BondAmount, CommissionType, CommissionAmount, VAT, Status, GrantDate, RegistrationDate, Bank.
-- [ ] AC-5: Given the API has returned data, when I view the payment grid, then the `CommissionPercent` field is NOT shown as a column anywhere in the grid.
-- [ ] AC-6: Given the API has returned data, when I view the grid rows, then monetary columns (BondAmount, CommissionAmount, VAT) are formatted as `R 1,234,567.89` (R prefix, comma thousand separator, period decimal separator, two decimal places) per BR9.
-- [ ] AC-7: Given the API has returned data, when I view the grid rows, then date columns (ClaimDate, GrantDate, RegistrationDate) are displayed in a human-readable format (e.g., `DD MMM YYYY` or `YYYY-MM-DD`).
+- [x] AC-4: Given the API has returned data, when I view the payment grid, then I see exactly these 13 columns in order: Reference, AgencyName, AgentName, AgentSurname, ClaimDate, BondAmount, CommissionType, CommissionAmount, VAT, Status, GrantDate, RegistrationDate, Bank.
+- [x] AC-5: Given the API has returned data, when I view the payment grid, then the `CommissionPercent` field is NOT shown as a column anywhere in the grid.
+- [x] AC-6: Given the API has returned data, when I view the grid rows, then monetary columns (BondAmount, CommissionAmount, VAT) are formatted as `R 1,234,567.89` (R prefix, comma thousand separator, period decimal separator, two decimal places) per BR9.
+- [x] AC-7: Given the API has returned data, when I view the grid rows, then date columns (ClaimDate, GrantDate, RegistrationDate) are displayed in a human-readable format (e.g., `DD MMM YYYY` or `YYYY-MM-DD`).
 
 ### Client-Side Pagination
 
-- [ ] AC-8: Given the API has returned more than 20 payments, when the page renders, then only the first 20 records are shown in the grid and pagination controls (Previous and Next buttons) are visible.
-- [ ] AC-9: Given I am on page 1, when I click the "Next" button, then the grid shows the next 20 records (rows 21–40) and the "Previous" button becomes enabled.
-- [ ] AC-10: Given I am on any page after the first, when I click the "Previous" button, then the grid shows the previous 20 records and I move back one page.
-- [ ] AC-11: Given I am on the last page, when I view the pagination controls, then the "Next" button is disabled.
-- [ ] AC-12: Given I am on the first page, when I view the pagination controls, then the "Previous" button is disabled.
-- [ ] AC-13: Given the API returns 20 or fewer payments, when the page renders, then the pagination controls are either hidden or both Previous and Next are disabled.
+- [x] AC-8: Given the API has returned more than 20 payments, when the page renders, then only the first 20 records are shown in the grid and pagination controls (Previous and Next buttons) are visible.
+- [x] AC-9: Given I am on page 1, when I click the "Next" button, then the grid shows the next 20 records (rows 21–40) and the "Previous" button becomes enabled.
+- [x] AC-10: Given I am on any page after the first, when I click the "Previous" button, then the grid shows the previous 20 records and I move back one page.
+- [x] AC-11: Given I am on the last page, when I view the pagination controls, then the "Next" button is disabled.
+- [x] AC-12: Given I am on the first page, when I view the pagination controls, then the "Previous" button is disabled.
+- [x] AC-13: Given the API returns 20 or fewer payments, when the page renders, then the pagination controls are either hidden or both Previous and Next are disabled.
 
 ### AgencyName Filter Dropdown
 
-- [ ] AC-14: Given the API has returned data, when I view the AgencyName filter dropdown, then it is populated with the distinct `AgencyName` values from the `PaymentList` array, sorted alphabetically.
-- [ ] AC-15: Given the AgencyName dropdown is rendered, when I open it, then the first option is "All Agencies" which represents no filter applied.
-- [ ] AC-16: Given "All Agencies" is selected (the default), when I view the grid, then all records from the API response are shown (subject to pagination).
-- [ ] AC-17: Given I select a specific agency from the dropdown, when the grid re-renders, then only rows where `AgencyName` matches the selected agency are shown.
-- [ ] AC-18: Given I select a specific agency and then select "All Agencies", when the grid re-renders, then all rows from the API response are shown again.
-- [ ] AC-19: Given I change the agency filter, when the grid updates, then the pagination resets to page 1.
+- [x] AC-14: Given the API has returned data, when I view the AgencyName filter dropdown, then it is populated with the distinct `AgencyName` values from the `PaymentList` array, sorted alphabetically.
+- [x] AC-15: Given the AgencyName dropdown is rendered, when I open it, then the first option is "All Agencies" which represents no filter applied.
+- [x] AC-16: Given "All Agencies" is selected (the default), when I view the grid, then all records from the API response are shown (subject to pagination).
+- [x] AC-17: Given I select a specific agency from the dropdown, when the grid re-renders, then only rows where `AgencyName` matches the selected agency are shown.
+- [x] AC-18: Given I select a specific agency and then select "All Agencies", when the grid re-renders, then all rows from the API response are shown again.
+- [x] AC-19: Given I change the agency filter, when the grid updates, then the pagination resets to page 1.
 
 ### Loading State
 
-- [ ] AC-20: Given I am on the Payment Management page, when the `GET /v1/payments` fetch is in-flight, then skeleton placeholder elements are visible in place of the grid rows.
-- [ ] AC-21: Given the data fetch completes, when the response is received, then the skeleton placeholders are replaced by the real grid rows.
+- [x] AC-20: Given I am on the Payment Management page, when the `GET /v1/payments` fetch is in-flight, then skeleton placeholder elements are visible in place of the grid rows.
+- [x] AC-21: Given the data fetch completes, when the response is received, then the skeleton placeholders are replaced by the real grid rows.
 
 ### Empty State
 
-- [ ] AC-22: Given the API returns an empty `PaymentList`, when the grid renders, then the grid body displays the message "No payments ready for processing." instead of an empty table body.
-- [ ] AC-23: Given a specific agency is selected and no payments match that agency, when the grid renders, then the grid body displays the message "No payments ready for processing."
+- [x] AC-22: Given the API returns an empty `PaymentList`, when the grid renders, then the grid body displays the message "No payments ready for processing." instead of an empty table body.
+- [x] AC-23: Given a specific agency is selected and no payments match that agency, when the grid renders, then the grid body displays the message "No payments ready for processing."
 
 ### Error State
 
-- [ ] AC-24: Given the `GET /v1/payments` call fails (network error or non-2xx response), when the error is received, then a toast notification is displayed describing the failure (e.g., "Failed to load payments. Please try again.").
-- [ ] AC-25: Given the API call fails, when I view the page, then the grid area shows an error placeholder or empty state rather than crashing the page.
+- [x] AC-24: Given the `GET /v1/payments` call fails (network error or non-2xx response), when the error is received, then a toast notification is displayed describing the failure (e.g., "Failed to load payments. Please try again.").
+- [x] AC-25: Given the API call fails, when I view the page, then the grid area shows an error placeholder or empty state rather than crashing the page.
 
 ### Accessibility
 
-- [ ] AC-26: Given I am on the Payment Management page, when I inspect the grid, then it uses semantic `<table>`, `<thead>`, `<tbody>`, `<tr>`, `<th>`, and `<td>` markup so screen readers can announce column headers with each cell.
+- [x] AC-26: Given I am on the Payment Management page, when I inspect the grid, then it uses semantic `<table>`, `<thead>`, `<tbody>`, `<tr>`, `<th>`, and `<td>` markup so screen readers can announce column headers with each cell.
 - [ ] AC-27: Given I am on the Payment Management page, when I navigate using the Tab key, then I can reach the AgencyName dropdown and the pagination buttons and each has a visible focus indicator.
 
 ## Requirements Traceability
@@ -115,7 +115,7 @@ interface PaymentRead {
   CommissionType: string;
   CommissionAmount: number;
   VAT: number;
-  Status: string;        // Contains StatusCode e.g. "REG", "MAN-PAY", "PARKED"
+  Status: { StatusCode: string };  // Normalised by getPayments() — access via payment.Status?.StatusCode
   GrantDate: string;
   RegistrationDate: string;
   Bank: string;
@@ -135,15 +135,17 @@ The existing `app/(protected)/payment-management/page.tsx` is a template stub. I
 
 ### Data Loading Pattern
 
-Fetch `GET /v1/payments` on component mount using the API client (`lib/api/client.ts`). Store the full `PaymentList` array in component state. Pagination and filtering are applied client-side from this in-memory list — no additional API calls are made when the user changes the page or selects an agency filter.
+Call `getPayments()` from `@/lib/api/endpoints` on component mount (do NOT call `get('/v1/payments')` directly). `getPayments()` unwraps the `{ PaymentList: [...] }` envelope and normalises each payment's `Status` to `{ StatusCode: string }` per BA-4. Access status via `payment.Status?.StatusCode` (e.g., `=== 'REG'`, `=== 'PARKED'`).
+
+Store the full `PaymentList` array in component state. Pagination and filtering are applied client-side from this in-memory list — no additional API calls are made when the user changes the page or selects an agency filter.
 
 ### Pagination Logic
 
-- Page size: 20 rows per page
+- Import `PAGINATION` from `@/lib/utils/constants` and use `PAGINATION.DEFAULT_PAGE_SIZE` (currently `20`) instead of hardcoding the number in implementation logic. (Leave the ACs' explicit "20 records" wording as-is — it is correct as spec.)
 - Track current page index in component state (reset to 1 when filter changes)
-- Derive `paginatedRows` as: `filteredList.slice((page - 1) * 20, page * 20)`
+- Derive `paginatedRows` as: `filteredList.slice((page - 1) * PAGINATION.DEFAULT_PAGE_SIZE, page * PAGINATION.DEFAULT_PAGE_SIZE)`
 - Previous button disabled when `page === 1`
-- Next button disabled when `page * 20 >= filteredList.length`
+- Next button disabled when `page * PAGINATION.DEFAULT_PAGE_SIZE >= filteredList.length`
 
 ### AgencyName Filter Logic
 
@@ -154,8 +156,8 @@ Fetch `GET /v1/payments` on component mount using the API client (`lib/api/clien
 
 ### Currency and Date Formatting
 
-- Monetary columns: use `formatCurrency` from `@/lib/utils/currency` (established in Epic 1, Story 1.3)
-- Date columns: use a consistent date formatter — `new Date(dateStr).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })` or equivalent. Null/empty dates render as `—`.
+- Monetary columns: use `formatCurrency` from `@/lib/utils/format` (e.g., `import { formatCurrency } from '@/lib/utils/format'`). The function returns `"R 1,234,567.89"` for a number, `"—"` for null/undefined.
+- Date columns: use `formatDate` from `@/lib/utils/format` (e.g., `import { formatDate } from '@/lib/utils/format'`). Outputs `"DD MMM YYYY"` (e.g., `"15 Mar 2024"`). Returns `"—"` for null/undefined/empty/unparseable values. Do NOT use `toLocaleDateString` directly — it has a UTC-offset shift bug on date-only strings that `formatDate` already corrects.
 
 ### Shadcn Components to Use
 
