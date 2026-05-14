@@ -370,6 +370,23 @@ function countWireframes() {
  * Returns the file path or null if not found.
  */
 function findTestDesignFile(epicNum, storyNum) {
+  return findTestDesignArtifact(epicNum, storyNum, 'test-design');
+}
+
+/**
+ * Find a test-handoff file for a given epic/story.
+ * The handoff doc owns the "Coverage for WRITE-TESTS" section and other
+ * engineering-facing metadata. Returns the file path or null if not found.
+ */
+function findTestHandoffFile(epicNum, storyNum) {
+  return findTestDesignArtifact(epicNum, storyNum, 'test-handoff');
+}
+
+/**
+ * Shared finder for files under generated-docs/test-design/epic-N-...
+ * Returns the first matching file path, or null.
+ */
+function findTestDesignArtifact(epicNum, storyNum, suffix) {
   if (!fs.existsSync(TEST_DESIGN_DIR)) return null;
 
   try {
@@ -380,7 +397,7 @@ function findTestDesignFile(epicNum, storyNum) {
       try {
         if (!fs.statSync(fullDir).isDirectory()) continue;
         const files = fs.readdirSync(fullDir)
-          .filter(f => f.match(new RegExp(`^story-${storyNum}-.*test-design\\.md$`)));
+          .filter(f => f.match(new RegExp(`^story-${storyNum}-.*${suffix}\\.md$`)));
         if (files.length > 0) return path.join(fullDir, files[0]);
       } catch { /* ignore */ }
     }
@@ -684,68 +701,94 @@ function parseACsFromStory(epicNum, storyNum) {
 }
 
 /**
- * Parse the Coverage for WRITE-TESTS section of a test-design document.
+ * Parse the coverage map and BA-decision count for a story.
  * Returns { coveredACs: Set<string>, baDecisionsPending: number }.
- * Only scans between "## Coverage for WRITE-TESTS" and the next "##" header.
+ *
+ * Implementation notes:
+ *   - "Coverage for WRITE-TESTS" header lives in the test-HANDOFF file
+ *     (Template B in test-designer.md). The test-DESIGN file (BA-facing,
+ *     Template A) holds the unresolved "BA decision required" blocks.
+ *   - Both files are scanned: handoff for coverage, design for BA count.
+ *   - Pre-2026-05-14, this helper only read test-design.md and missed
+ *     coverage entirely. Existing callers (dashboard, traceability) now
+ *     get correct results.
  */
 function parseTestDesignCoverage(epicNum, storyNum) {
   const result = { coveredACs: new Set(), baDecisionsPending: 0 };
+
+  // 1. BA decisions live in the BA-facing test-design doc.
   const tdPath = findTestDesignFile(epicNum, storyNum);
-  if (!tdPath) return result;
+  if (tdPath) {
+    try {
+      const tdContent = fs.readFileSync(tdPath, 'utf-8');
+      // Count "BA decision required" blocks ONLY — already-resolved blocks
+      // (which the test-design agent rewrites to "BA decision resolved")
+      // must not be counted as pending. The regex is anchored to "required"
+      // (not "resolved") so it matches "**BA decision required (BA-N):**"
+      // and similar variants without accidentally catching resolutions.
+      const baMatches = tdContent.match(/BA decision required/gi);
+      result.baDecisionsPending = baMatches ? baMatches.length : 0;
+    } catch { /* ignore */ }
+  }
 
-  try {
-    const tdContent = fs.readFileSync(tdPath, 'utf-8');
+  // 2. Coverage map lives in the engineering test-handoff doc.
+  const handoffPath = findTestHandoffFile(epicNum, storyNum);
+  if (handoffPath) {
+    try {
+      const hoContent = fs.readFileSync(handoffPath, 'utf-8');
+      const coverageHeader = '## Coverage for WRITE-TESTS';
+      const coverageStart = hoContent.indexOf(coverageHeader);
+      if (coverageStart !== -1) {
+        const afterCoverage = hoContent.slice(coverageStart + coverageHeader.length);
+        const nextHeader = afterCoverage.indexOf('\n## ');
+        const coverageText = nextHeader >= 0 ? afterCoverage.slice(0, nextHeader) : afterCoverage;
 
-    // Count BA decisions in full document
-    const baMatches = tdContent.match(/BA decision required/gi);
-    result.baDecisionsPending = baMatches ? baMatches.length : 0;
-
-    // Extract only the Coverage for WRITE-TESTS section
-    const coverageHeader = '## Coverage for WRITE-TESTS';
-    const coverageStart = tdContent.indexOf(coverageHeader);
-    if (coverageStart === -1) return result;
-    const afterCoverage = tdContent.slice(coverageStart + coverageHeader.length);
-    const nextHeader = afterCoverage.indexOf('\n## ');
-    const coverageText = nextHeader >= 0 ? afterCoverage.slice(0, nextHeader) : afterCoverage;
-
-    // Scan for AC references within the coverage section only, normalize to AC-N
-    const acRe = acIdRegex();
-    let am;
-    while ((am = acRe.exec(coverageText)) !== null) {
-      result.coveredACs.add(`AC-${am[1]}`);
-    }
-  } catch { /* ignore */ }
+        const acRe = acIdRegex();
+        let am;
+        while ((am = acRe.exec(coverageText)) !== null) {
+          result.coveredACs.add(`AC-${am[1]}`);
+        }
+      }
+    } catch { /* ignore */ }
+  }
 
   return result;
 }
 
 /**
- * Scan a test file for AC-N references anywhere in the file.
- * Returns Set<string> of AC IDs found.
+ * Scan all test files (Vitest unit/integration + Playwright e2e) for AC-N
+ * references anywhere in the file. Returns Set<string> of AC IDs found.
+ *
+ * An AC is considered "tested" if any spec file references its ID, whether
+ * the spec is Vitest (jsdom) or Playwright (real browser). The script-first
+ * spec-compliance check uses this to detect ACs with no automated coverage.
  */
 function scanTestFileForACs(epicNum, storyNum) {
   const tested = new Set();
-  const testDirs = ['web/src/__tests__/integration', 'web/src/__tests__'];
+  const sources = [
+    { dir: 'web/src/__tests__/integration', extensions: ['.test.tsx', '.test.ts'] },
+    { dir: 'web/src/__tests__',             extensions: ['.test.tsx', '.test.ts'] },
+    { dir: 'web/e2e',                       extensions: ['.spec.ts',  '.spec.tsx'] }
+  ];
 
-  for (const dir of testDirs) {
-    if (!fs.existsSync(dir)) continue;
+  for (const source of sources) {
+    if (!fs.existsSync(source.dir)) continue;
     try {
-      const entries = fs.readdirSync(dir, { recursive: true });
-      const testFiles = entries.filter(f =>
+      const entries = fs.readdirSync(source.dir, { recursive: true });
+      const matchingFiles = entries.filter(f =>
         typeof f === 'string' &&
         f.includes(`epic-${epicNum}`) &&
         f.includes(`story-${storyNum}`) &&
-        (f.endsWith('.test.tsx') || f.endsWith('.test.ts'))
+        source.extensions.some(ext => f.endsWith(ext))
       );
-      for (const tf of testFiles) {
-        const content = fs.readFileSync(path.join(dir, tf), 'utf-8');
+      for (const tf of matchingFiles) {
+        const content = fs.readFileSync(path.join(source.dir, tf), 'utf-8');
         const re = acIdRegex();
         let m;
         while ((m = re.exec(content)) !== null) {
           tested.add(`AC-${m[1]}`);
         }
       }
-      if (testFiles.length > 0) break;
     } catch { /* ignore */ }
   }
 
@@ -1486,6 +1529,16 @@ function nextPendingStoryInPass(state) {
  * Mark a story as COMPLETE for the current pass and advance to the next
  * pending story (setting it to IN_PROGRESS). Returns { completedStory, nextStory, allComplete }.
  * Mutates state.
+ *
+ * Strict-sequential vs DAG:
+ *   - In passes other than IMPLEMENT (REALIGN/TEST-DESIGN/WRITE-TESTS), this
+ *     auto-promotes the next PENDING story in numerical order — the legacy
+ *     behaviour that all callers rely on.
+ *   - In IMPLEMENT, the orchestrator may have already promoted multiple
+ *     stories to IN_PROGRESS via `promoteRunnableStoriesInPass()` for DAG
+ *     execution. In that case this function does NOT auto-promote — the
+ *     orchestrator is owning scheduling. It still marks `storyNum` COMPLETE.
+ *     If only one story was IN_PROGRESS, the auto-promote keeps working.
  */
 function markStoryCompleteInPass(state, storyNum) {
   const epicPass = readEpicPass(state);
@@ -1496,13 +1549,18 @@ function markStoryCompleteInPass(state, storyNum) {
   }
   epicPass.storyPhases[key] = 'COMPLETE';
 
-  // Promote the next PENDING story to IN_PROGRESS
+  // Auto-promote only when scheduling is sequential (≤1 story IN_PROGRESS
+  // before this completion). In DAG mode (IMPLEMENT pass with multiple
+  // in-flight stories), the orchestrator drives promotion explicitly.
+  const inProgressRemaining = Object.values(epicPass.storyPhases).filter(p => p === 'IN_PROGRESS').length;
   let nextStory = null;
-  for (const n of epicPass.storyOrder) {
-    if (epicPass.storyPhases[String(n)] === 'PENDING') {
-      epicPass.storyPhases[String(n)] = 'IN_PROGRESS';
-      nextStory = n;
-      break;
+  if (inProgressRemaining === 0) {
+    for (const n of epicPass.storyOrder) {
+      if (epicPass.storyPhases[String(n)] === 'PENDING') {
+        epicPass.storyPhases[String(n)] = 'IN_PROGRESS';
+        nextStory = n;
+        break;
+      }
     }
   }
 
@@ -1510,6 +1568,34 @@ function markStoryCompleteInPass(state, storyNum) {
   if (nextStory) state.currentStory = nextStory;
 
   return { completedStory: storyNum, nextStory, allComplete };
+}
+
+/**
+ * Promote every PENDING/REWORK story whose dependencies are all COMPLETE
+ * to IN_PROGRESS. Used by the EPIC-IMPLEMENT DAG dispatcher.
+ *
+ * Returns the array of story numbers that just transitioned to IN_PROGRESS.
+ * Mutates state.
+ *
+ * Only valid in the IMPLEMENT pass — refuses to run otherwise.
+ */
+function promoteRunnableStoriesInPass(state) {
+  const ep = readEpicPass(state);
+  if (!ep) throw new Error('promoteRunnableStoriesInPass: no epicPass on state');
+  if (ep.phase !== 'IMPLEMENT') {
+    throw new Error(`promoteRunnableStoriesInPass: only valid during IMPLEMENT pass, got "${ep.phase}"`);
+  }
+  const runnable = nextRunnableStories(state);
+  for (const n of runnable) {
+    ep.storyPhases[String(n)] = 'IN_PROGRESS';
+  }
+  if (runnable.length > 0) {
+    // Keep state.currentStory pointing at one of the in-flight stories
+    // (deterministic: lowest-numbered). The orchestrator uses this as a
+    // tie-breaker; the actual scheduling reads storyPhases directly.
+    state.currentStory = runnable[0];
+  }
+  return runnable;
 }
 
 /**
@@ -1576,6 +1662,112 @@ function currentEpicPassPhase(state) {
 }
 
 // =============================================================================
+// DAG SCHEDULING FOR EPIC-IMPLEMENT (per-story dependencies)
+// =============================================================================
+//
+// During EPIC-IMPLEMENT, stories advance Strict-sequentially by default
+// (Story N reads Story N-1's code). But stories with disjoint file scopes
+// (e.g., a pure utilities story has nothing to do with an auth story) can
+// run in parallel — that's the DAG.
+//
+// Dependencies are declared in each story file's frontmatter:
+//
+//   ---
+//   dependsOn: []          # no dependencies — can run as soon as IMPLEMENT pass starts
+//   dependsOn: [1]         # waits for story 1
+//   dependsOn: [1, 2]      # waits for stories 1 AND 2
+//   ---
+//
+// If `dependsOn:` is absent the story falls back to "depends on all prior
+// stories" — the conservative (legacy strict-sequential) behaviour. That
+// keeps existing epics working until story files are updated.
+
+/**
+ * Parse `dependsOn:` from a story file's frontmatter.
+ * Returns: array of story numbers, or null if the field is absent.
+ *   null  → caller should fall back to "depends on all prior stories"
+ *   []    → no dependencies (story runs as soon as the pass starts)
+ *   [N..] → waits for those story numbers to complete the current pass
+ */
+function parseStoryDependencies(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    // Frontmatter is the first --- block. Find dependsOn: there.
+    const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+    if (!fmMatch) return null;
+    const fm = fmMatch[1];
+    const m = fm.match(/^dependsOn:\s*(.+)$/m);
+    if (!m) return null;
+    const raw = m[1].trim();
+    // Accept: [], [1], [1, 2], or inline-flow [1, 2, 3]
+    if (raw === '[]' || raw === '') return [];
+    const bracketed = raw.match(/^\[([^\]]*)\]$/);
+    if (bracketed) {
+      return bracketed[1].split(',').map(s => parseInt(s.trim(), 10)).filter(n => !Number.isNaN(n));
+    }
+    // Bare number(s) without brackets, e.g. "dependsOn: 1, 2"
+    return raw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !Number.isNaN(n));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build a story-dependency map for an epic by reading each story file's frontmatter.
+ * Returns Map<storyNum, deps[]>. Stories without explicit `dependsOn:` get the
+ * conservative default: depend on all numerically earlier stories.
+ */
+function buildEpicDependencyMap(epicNum) {
+  const epicDir = findEpicDir(epicNum);
+  if (!epicDir) return new Map();
+  const stories = findStoryFiles(epicDir).sort((a, b) => a.num - b.num);
+  const deps = new Map();
+  for (const s of stories) {
+    const parsed = parseStoryDependencies(s.path);
+    if (parsed === null) {
+      // No explicit dependsOn — fall back to "all prior stories" (legacy strict).
+      deps.set(s.num, stories.filter(x => x.num < s.num).map(x => x.num));
+    } else {
+      deps.set(s.num, parsed);
+    }
+  }
+  return deps;
+}
+
+/**
+ * Return the set of story numbers that are READY to run within the current
+ * IMPLEMENT pass: not yet COMPLETE in storyPhases, and all their dependencies
+ * are COMPLETE.
+ *
+ * Used by the orchestrator's EPIC-IMPLEMENT dispatch to launch independent
+ * stories in parallel. The transition-phase guard allows multiple stories
+ * to be IN_PROGRESS simultaneously within the IMPLEMENT pass only.
+ *
+ * Returns: number[] sorted ascending (deterministic ordering).
+ */
+function nextRunnableStories(state) {
+  const ep = readEpicPass(state);
+  if (!ep || ep.phase !== 'IMPLEMENT') return [];
+  const epicNum = state.currentEpic;
+  if (!epicNum) return [];
+
+  const deps = buildEpicDependencyMap(epicNum);
+  const phases = ep.storyPhases || {};
+
+  const runnable = [];
+  for (const storyNum of ep.storyOrder) {
+    const status = phases[String(storyNum)];
+    if (status === 'COMPLETE' || status === 'IN_PROGRESS') continue;
+    if (status !== 'PENDING' && status !== 'REWORK') continue;
+
+    const myDeps = deps.get(storyNum) || [];
+    const allDepsComplete = myDeps.every(d => phases[String(d)] === 'COMPLETE');
+    if (allDepsComplete) runnable.push(storyNum);
+  }
+  return runnable.sort((a, b) => a - b);
+}
+
+// =============================================================================
 // EXPORTS
 // =============================================================================
 
@@ -1625,6 +1817,7 @@ module.exports = {
 
   // Story phase determination
   findTestDesignFile,
+  findTestHandoffFile,
   storyHasTestDesign,
   storyHasTests,
   findFirstIncompleteStory,
@@ -1673,6 +1866,12 @@ module.exports = {
   initEpicPass,
   nextPendingStoryInPass,
   markStoryCompleteInPass,
+  promoteRunnableStoriesInPass,
   advanceEpicPass,
-  currentEpicPassPhase
+  currentEpicPassPhase,
+
+  // DAG scheduling for EPIC-IMPLEMENT
+  parseStoryDependencies,
+  buildEpicDependencyMap,
+  nextRunnableStories
 };

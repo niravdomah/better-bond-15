@@ -191,6 +191,11 @@ function validateTransition(currentPhase, targetPhase, state, epicNum, storyNum)
   // Story N+1 can only enter REALIGN/WRITE-TESTS once Story N has COMPLETEd
   // the SAME pass. epicPass.storyPhases[N-1] === 'COMPLETE' is the authoritative
   // signal — same-pass-next-story is the normal progression within a pass.
+  //
+  // EXCEPTION — IMPLEMENT pass under DAG scheduling: stories with declared
+  // `dependsOn:` metadata may run in parallel. The guard here uses the DAG
+  // helper: Story N can enter IMPLEMENT once its declared dependencies are
+  // COMPLETE, regardless of numerical predecessors.
   if (storyNum && storyNum > 1 && ['REALIGN', 'WRITE-TESTS'].includes(targetPhase)) {
     const epicPass = state?.epicPass;
     if (!epicPass) {
@@ -204,6 +209,29 @@ function validateTransition(currentPhase, targetPhase, state, epicNum, storyNum)
       return {
         valid: false,
         message: `Cannot start Story ${storyNum} in ${epicPass.phase} pass: Story ${storyNum - 1} has not finished this pass (status: ${prevPhase || 'UNKNOWN'})`
+      };
+    }
+    return { valid: true };
+  }
+
+  // IMPLEMENT-pass DAG check: enforce declared dependencies (not numerical
+  // predecessors). Falls back to the legacy "all prior stories" rule when
+  // story files don't declare dependsOn.
+  if (storyNum && storyNum > 1 && targetPhase === 'IMPLEMENT') {
+    const epicPass = state?.epicPass;
+    if (!epicPass) {
+      return {
+        valid: false,
+        message: `Cannot start Story ${storyNum} IMPLEMENT: epicPass is missing.`
+      };
+    }
+    const depMap = helpers.buildEpicDependencyMap(epicNum);
+    const myDeps = depMap.get(storyNum) || [];
+    const unmet = myDeps.filter(d => epicPass.storyPhases[String(d)] !== 'COMPLETE');
+    if (unmet.length > 0) {
+      return {
+        valid: false,
+        message: `Cannot start Story ${storyNum} IMPLEMENT: dependency stories not yet COMPLETE — ${unmet.join(', ')}.`
       };
     }
     return { valid: true };
@@ -1271,6 +1299,7 @@ Usage:
   node .claude/scripts/transition-phase.js --pause-phase
   node .claude/scripts/transition-phase.js --init-epic-pass <N>
   node .claude/scripts/transition-phase.js --complete-story-pass [--story M]
+  node .claude/scripts/transition-phase.js --promote-runnable-stories
   node .claude/scripts/transition-phase.js --advance-pass
   node .claude/scripts/transition-phase.js --record-qa-finding --story M --note "..."
   node .claude/scripts/transition-phase.js --show
@@ -1303,6 +1332,7 @@ Options:
   --pause-phase           Mark PHASE-BOUNDARY as paused (user picked "Stop here")
   --init-epic-pass <N>    Explicitly initialise epicPass for epic N (normally auto-fires at STORIES → REALIGN for story 1)
   --complete-story-pass   Mark current story as COMPLETE for the current pass and advance to next pending story
+  --promote-runnable-stories  DAG dispatch for IMPLEMENT pass: promote every PENDING story whose dependencies are COMPLETE
   --advance-pass          Advance epicPass to the next pass (requires all stories COMPLETE in current pass)
   --record-qa-finding     Record a QA finding under epicPass.qaFindings[story] during EPIC-QA
   --show                  Display current workflow state
@@ -1877,6 +1907,50 @@ function main() {
         : `Story ${storyNum} completed ${state.epicPass.phase} pass. Next: Story ${result.nextStory}.`,
       passComplete: result.allComplete,
       nextStory: result.nextStory,
+      epicPass: state.epicPass
+    }, null, 2));
+    return;
+  }
+
+  // --promote-runnable-stories
+  // For the IMPLEMENT pass under DAG scheduling: promote every PENDING story
+  // whose declared dependencies (or numerical predecessors if no dependsOn:)
+  // are COMPLETE. Returns the set of newly-promoted story numbers so the
+  // orchestrator can launch them in parallel.
+  if (args.includes('--promote-runnable-stories')) {
+    const state = readState();
+    if (!state) exitWithError('No workflow state found.');
+    if (!helpers.hasEpicPass(state)) exitWithError('--promote-runnable-stories requires epicPass.');
+    if (state.epicPass.phase !== 'IMPLEMENT') {
+      exitWithError(`--promote-runnable-stories only valid in IMPLEMENT pass (current: ${state.epicPass.phase}).`);
+    }
+
+    let promoted;
+    try {
+      promoted = helpers.promoteRunnableStoriesInPass(state);
+    } catch (e) {
+      exitWithError(e.message);
+    }
+
+    if (!state.history) state.history = [];
+    state.history.push({
+      timestamp: new Date().toISOString(),
+      epic: state.currentEpic,
+      story: null,
+      from: 'IMPLEMENT',
+      to: 'IMPLEMENT',
+      note: promoted.length > 0
+        ? `DAG promoted to IN_PROGRESS: ${promoted.join(', ')}`
+        : 'DAG promote: nothing runnable (waiting on in-flight dependencies or all done)'
+    });
+
+    writeState(state);
+    console.log(JSON.stringify({
+      status: 'ok',
+      message: promoted.length > 0
+        ? `Promoted ${promoted.length} runnable story(s): ${promoted.join(', ')}.`
+        : 'No runnable stories — every PENDING story is waiting on an in-flight dependency, or all stories are COMPLETE.',
+      promoted,
       epicPass: state.epicPass
     }, null, 2));
     return;

@@ -289,6 +289,23 @@ Reference the AC-N identifiers from the story file. Every AC from the story MUST
 - AC-2: [description from story] → Example 2
 - AC-3: [description from story] → Edge Example 1
 
+## Implementation Targets
+
+Required machine-readable contract for the IMPLEMENT phase. List every file the developer agent will create or modify, plus a one-line action. The developer's prompt anchors on this list — files not listed should not be touched unless the developer explicitly justifies it. Format: one bullet per file with `path → action`.
+
+- `<path-relative-to-repo-root> → create | modify | delete | replace` with a short clause describing the change
+- For "modify" entries, name the specific function/export/section being changed
+- For "create" entries, name the primary exports the file will provide
+
+Example (Story 1.3 — API client + utilities):
+
+- `web/src/lib/utils/format.ts → create with formatCurrency, formatDate (return "—" for null/undefined per BA-2/3; "15 Mar 2024" format per BA-1)`
+- `web/src/lib/api/endpoints.ts → replace template signatures with getDashboard, getPayments (unwraps PaymentList envelope, normalises Status per BA-4), parkPayments, unparkPayments, createPaymentBatch (injects LastChangedUser header), getPaymentBatches, downloadInvoicePdf (Blob), resetDemoData`
+- `web/src/types/api-generated.ts → modify PaymentRead.Status from string to { StatusCode: string; Description?: string } per BA-4`
+- `web/src/lib/utils/constants.ts → modify PAGINATION.DEFAULT_PAGE_SIZE from 25 to 20 per FRS R8/R18`
+
+This section eliminates the developer agent's "where do I put this?" exploration time — typically 3-5 minutes per story.
+
 ## Handoff Notes for WRITE-TESTS
 
 - Only generate executable tests from examples in the test-design document

@@ -136,10 +136,27 @@ No user gating in this pass. When all stories are COMPLETE, run `--advance-pass`
 
 ### Phase: EPIC-IMPLEMENT
 
-For each PENDING/IN_PROGRESS story in `epicPass.storyOrder` (strict sequential — Story 1 first, then Story 2, ...):
+EPIC-IMPLEMENT supports DAG scheduling: stories with declared `dependsOn:` metadata may run in parallel. Stories without explicit metadata fall back to the conservative all-prior-stories dependency (legacy strict-sequential).
 
-1. Launch the **developer** agent for the story (single autonomous call — see [orchestrator-rules.md § IMPLEMENT](../shared/orchestrator-rules.md#implement-single-call--fully-autonomous)). The agent prompt must include: `"You are story M in the EPIC-IMPLEMENT pass. Stories 1..M-1 in this pass have already implemented — their code is on disk. Read the existing patterns and extend them; do not rebuild what they already produced."`
-2. After it returns, run `--complete-story-pass --story M`.
+**Iteration model:**
+
+1. Run `node .claude/scripts/transition-phase.js --promote-runnable-stories`. This promotes every PENDING story whose dependencies are all COMPLETE to IN_PROGRESS and returns their numbers as `promoted: [...]`. If `promoted` is empty AND no stories are still IN_PROGRESS, the pass is fully done — proceed to step 4.
+
+2. Launch the **developer** agent for each promoted story **in parallel** (one Agent call per story in a single message — Claude will run them concurrently). Each agent prompt must include these anchors verbatim:
+
+   > "**Implementation contract.** Open `generated-docs/test-design/epic-N-[slug]/story-M-[slug]-test-handoff.md` and read the `## Implementation Targets` section. That list is your contract — create/modify exactly those files. If you need to touch a file not listed, explain why in your summary and confirm it doesn't conflict with another story's targets."
+   >
+   > "**DAG ordering.** Your story declares `dependsOn:` in its frontmatter; the orchestrator promoted you because every dependency is on disk and COMPLETE. Stories running in parallel with you have disjoint file scopes. If you encounter a file conflict with a parallel story, STOP and report it — that's a `dependsOn:` declaration bug."
+   >
+   > "**Sequential predecessors.** Stories listed in your `dependsOn:` have already implemented — their code is on disk. Read the existing patterns and extend them; do not rebuild what they already produced."
+
+3. As each developer returns, run `node .claude/scripts/transition-phase.js --complete-story-pass --story M` for that story. Once ALL the in-parallel developers have returned, loop back to step 1 (in case the completed stories unblock new runnable stories).
+
+4. When all `storyPhases` are COMPLETE, run `node .claude/scripts/transition-phase.js --advance-pass` to advance to EPIC-QA.
+
+**File-conflict insurance:** if `dependsOn:` is declared incorrectly and two parallel developers both modify the same file, the second commit will fail tests (or even the build). The fix is to add a missing dependency edge and re-run from cycle 1. The orchestrator should treat any "I tried to modify file X but found unexpected content" report from a parallel developer as a `dependsOn:` correctness bug to surface in the next plan revision.
+
+**Legacy strict-sequential mode:** stories without explicit `dependsOn:` get the conservative default (depend on every numerically-earlier story). This means existing epics work without changes — `--promote-runnable-stories` returns one story at a time, the same as the old strict flow. Stories opt INTO parallelism by declaring `dependsOn: []` or `dependsOn: [N]` in their frontmatter.
 
 Strict order is required because Story N's developer agent reads Story N-1's just-completed code. No user gating in this pass. When all stories are COMPLETE, run `--advance-pass` to advance to EPIC-QA. Fire dashboard update.
 
@@ -159,14 +176,45 @@ A single epic-level QA pass: one E2E run, one consolidated manual verification, 
    - "All stories pass" → continue to commit
    - "Findings on specific stories" → for each story with findings, run `node .claude/scripts/transition-phase.js --record-qa-finding --story M --note "..."`, then enter QA Fix Cycle
 
-4. **QA Fix Cycle (per-story scoping)**: for each story with findings:
-   - Launch the **developer** agent scoped to the story (prompt includes the finding text + story context).
-   - Re-run that story's Vitest + Playwright spec only.
-   - Increment `epicPass.fixCycles[M]`. If `fixCycles[M] >= 3`, halt and ask the user how to proceed (do not auto-retry).
-   - When all flagged stories' fixes land, run **full-epic Vitest + Playwright + spec-compliance-watchdog** as the cross-story regression gate. Failures here go back into the fix cycle.
-   - Re-prompt manual verification ONLY for the stories that had findings.
+4. **QA Fix Cycle (per-story fix, regression gate once per cycle)**:
 
-5. **Spec Compliance Check (Gate 6, epic-level)**: launch the **spec-compliance-watchdog** with prompt: `"Verify implementation matches specs across this epic. Compare against the epicPass.passStartedAt baseline diff (all stories in this epic)."` Any drift halts the commit and goes through the standard drift resolution.
+   The cycle has TWO distinct phases. The orchestrator owns the boundary between them.
+
+   **4a — Per-story fix phase (parallel where stories are disjoint)**: for each story with findings, launch the **developer** agent scoped to that story. The orchestrator's prompt to each developer must include this verbatim constraint:
+
+   > "**Re-run ONLY `npm --prefix web test -- epic-N-story-M` and (if a routable spec exists) `npx playwright test web/e2e/epic-N-story-M-*.spec.ts`.** Do NOT re-run the full Vitest suite, the full Playwright suite, or any other story's tests. The orchestrator runs the full-epic regression gate ONCE after all flagged stories' fixes are green — re-running it inside your work is duplicate effort that costs ~5 minutes of agent time per fix attempt. If your story-scoped tests pass, return. If they fail, iterate on the fix (up to your own internal retry budget)."
+
+   Increment `epicPass.fixCycles[M]` per story per cycle. If `fixCycles[M] >= 3`, halt and ask the user how to proceed (do not auto-retry).
+
+   **4b — Cross-story regression gate (ONCE per fix cycle, after 4a)**: after every flagged story's developer has returned green on its own tests, the orchestrator runs the full-epic regression gate ONE TIME:
+
+   ```bash
+   npm --prefix web test                                                  # full Vitest
+   node .claude/scripts/run-e2e-verification.js --epic-mode --epic <N>    # full Playwright
+   node .claude/scripts/check-spec-compliance.js --epic <N>               # script-first spec
+   ```
+
+   Each command's exit code is the gate. If anything fails here, identify the regressing story from the failure trace and route ONLY that story back into 4a as cycle attempt N+1. Do not re-run unaffected stories.
+
+   When 4b passes clean: re-prompt manual verification ONLY for the stories that originally had findings (untouched stories don't need re-verification).
+
+5. **Spec Compliance Check (Gate 6, script-first with LLM escalation)**:
+
+   ```bash
+   node .claude/scripts/check-spec-compliance.js --epic <N>
+   ```
+
+   The script statically checks every AC against the test-design coverage map, test files (Vitest + Playwright), and BA-decision resolution. It runs in under a second. Three outcomes:
+
+   - **`status: "clean"`** (exit 0): no structural drift. Log a one-line confirmation (`Spec-compliance script returned clean — skipping LLM watchdog.`) and proceed to step 6. Semantic drift the script cannot detect (e.g., test asserts a different value than the AC describes) is not common after a clean fix cycle and the saved 5–7 minutes per epic is the optimization budget.
+
+   - **`status: "discrepancies"`** (exit 1): findings exist. Launch the **spec-compliance-watchdog** Call A with the script's JSON findings pre-loaded in the prompt:
+
+     > "This is Call A — Analyze Compliance. EPIC-level scope for Epic [N]. The script-first compliance check at `.claude/scripts/check-spec-compliance.js` ran first and returned these findings (pre-loaded so you don't have to re-discover the structural gaps): [paste the full JSON]. For each finding, classify it as one of: (a) **legitimate-deferred** — AC is verified by build/runtime/manual and is expected not to appear in test files (note it in the response so the test-handoff doc can record it); (b) **real drift** — AC genuinely lacks coverage and needs a fix-cycle entry; (c) **false positive** — the AC actually IS referenced by a test the script missed. Additionally, look for **semantic drift** the script cannot detect: tests asserting values that differ from the AC text, implementation symbols renamed from what the AC describes, BA decisions misapplied. Return a structured report grouped per story."
+
+   - **`status: "error"`** (script crashed): STOP and report the script failure. The watchdog cannot substitute for a broken script run.
+
+   Any "real drift" or watchdog-surfaced semantic drift halts the commit and routes back into fix cycle for the affected story.
 
 6. **Commit (Call C, single)**: once everything is green, launch **code-reviewer** Call C with prompt: `"Epic-level QA pass. Stage all epic changes. Commit with message: 'feat(epic-<N>): <epic name>'."` This is ONE commit covering all stories.
 

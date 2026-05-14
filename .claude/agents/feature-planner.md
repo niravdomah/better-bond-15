@@ -471,6 +471,14 @@ When a feature IS the home page, clarify this in acceptance criteria:
 
 > **Filename rule — no epic prefix.** The epic number lives in the parent directory (`epic-N-[slug]/`), NOT in the story filename. Write `story-3-role-aware-nav.md`, never `story-1-3-role-aware-nav.md`. A PreToolUse hook (`.claude/hooks/enforce-generated-doc-names.js`) enforces this and will reject writes that don't match. Full convention list: [.claude/shared/naming-conventions.md](../shared/naming-conventions.md) (schema: [generated-doc-conventions.json](../shared/generated-doc-conventions.json)).
 
+> **`dependsOn:` frontmatter — DAG scheduling for IMPLEMENT.** Every story file gets a `dependsOn:` field in its frontmatter. The orchestrator uses this during EPIC-IMPLEMENT to run independent stories in parallel.
+>
+> - `dependsOn: []` — no dependencies, the story can implement as soon as the IMPLEMENT pass starts. Use this for utility/infrastructure/API-client stories whose files don't overlap with any other story.
+> - `dependsOn: [1]` (or `[1, 2]`) — wait for those story numbers to finish IMPLEMENT first. Use this when the story will read or extend the listed stories' code on disk.
+> - **Omit the field** — falls back to "depend on every numerically-earlier story" (conservative legacy strict-sequential). Only use this when you genuinely cannot reason about the dependency structure.
+>
+> **How to decide:** for each story you're proposing, list the files it will create or modify. If those files are read or extended by another story in the same epic, that story `dependsOn:` this one. Auth/foundation stories typically appear in many `dependsOn:` lists; pure utility/API stories typically have `dependsOn: []`. **Use the conservative default** when uncertain — a missing edge causes parallel developers to fight over a file; an extra edge only costs a few minutes of sequencing.
+
 > **Annotate cross-page acceptance criteria.** Any AC whose verification depends on a route, component, or future story that may not exist when this story enters QA must carry a trailing `[requires: ...]` tag (inline-code, comma-separated `key=value` pairs). Tag keys: `route=<path>`, `story=<N>.<M>`, `hint=<free text>`. Example:
 >
 >     - [ ] AC-6: …Payment Management link is highlighted `[requires: route=/payment-management, hint=Story 1.4 adds this route]`
@@ -479,6 +487,10 @@ When a feature IS the home page, clarify this in acceptance criteria:
 
 
 ```markdown
+---
+dependsOn: []
+---
+
 # Story: [Title]
 
 **Epic:** [Name] | **Story:** N of Total | **Wireframe:** [link or N/A]

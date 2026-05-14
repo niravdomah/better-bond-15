@@ -121,11 +121,19 @@ Implements the current story to make failing tests pass. After IMPLEMENT complet
 As you complete each acceptance criterion, update the story file to check it off:
 `- [ ] AC-N:` → `- [x] AC-N:`. Preserve the AC-N identifier when toggling checkboxes. This provides mid-story progress visibility on the dashboard.
 
-### Phase 1.5: Codebase Scan
+### Phase 1.5: Read the Implementation Contract, then Targeted Scan
 
-**Before writing any code**, do a quick inventory of what already exists in `web/src/` that is relevant to the current story. This prevents rebuilding utilities, components, or patterns the template (or earlier stories in the IMPLEMENT pass) already provide.
+**Before writing any code:**
 
-> **Pass ordering:** the orchestrator runs IMPLEMENT for each story in `epicPass.storyOrder` strictly sequentially. By the time you run for story M, stories 1..M-1 in the same epic have already implemented — their code is on disk. Treat that on-disk code as authoritative; extend its patterns rather than rebuilding what they produced. The Phase 1.5 scan is the primary mechanism for finding what they did.
+1. **Read the test-handoff's `## Implementation Targets` section** at `generated-docs/test-design/epic-N-[slug]/story-M-[slug]-test-handoff.md`. This is the canonical list of files you will create or modify for this story, with one-line actions. Anchor your work on it.
+
+2. **Scan the targets + their immediate neighbours**, not the whole `web/src/` tree. For each target, read the file (if it exists) to understand current shape; for each target's directory, list one level to spot related modules. This is a 30-second pass, not a deep audit.
+
+3. **If a target listed in the handoff conflicts with what you find on disk** (e.g., the handoff says "create X" but X already exists), STOP and report the conflict to the orchestrator before changing anything. The fix is to update the handoff, not to silently deviate.
+
+4. **If you discover during implementation that you need a file the handoff didn't list**, add it to your final summary with a one-line justification. This is allowed but discouraged — the handoff is the contract.
+
+> **Pass ordering:** the orchestrator runs IMPLEMENT for each story in `epicPass.storyOrder` strictly sequentially. By the time you run for story M, stories 1..M-1 in the same epic have already implemented — their code is on disk. Treat that on-disk code as authoritative; extend its patterns rather than rebuilding what they produced.
 
 **Scan procedure:**
 

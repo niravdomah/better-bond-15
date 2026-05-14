@@ -112,6 +112,25 @@ Next Steps:
 
 Then, **return control to the caller.**
 
+## Optional: Prune template scaffolding
+
+If the user knows their feature is a **single-role POC** (no multi-role RBAC, uses Shadcn Sonner for toasts, no signup/forgot-password routes), they can strip the template's unused scaffolding upfront and save the first epic ~15-20 minutes of "delete template code" work.
+
+Mention this once as a Phase 5 step the user can opt into:
+
+```
+Optional one-time cleanup:
+  node .claude/scripts/template-prune.js              # dry-run, shows what would change
+  node .claude/scripts/template-prune.js --apply      # apply the minimal-poc profile
+
+Use this if your feature is a single-role POC. It removes the multi-role
+auth helpers, RoleGate, custom toast context, /auth/signup|signout|forbidden
+routes, and the example pages — all things you'd otherwise delete during
+Epic 1's IMPLEMENT pass. Safe to re-run (idempotent).
+```
+
+Do NOT run it automatically — single-role vs multi-role is a project decision the user owns. Surfacing the option is enough.
+
 ## Error Handling
 
 - **npm install fails:** Check Node version, network, suggest fixes

@@ -872,11 +872,14 @@ Each pass below corresponds to a `### Phase: EPIC-<PASS>` section in [continue.m
 - Tests for later stories are written from `test-handoff.md` metadata (NOT from on-disk code) — the `renderScope` field set in TEST-DESIGN tells test-generator whether to render a full page or a component in isolation.
 - `--advance-pass` when complete. Dashboard update.
 
-**EPIC-IMPLEMENT**
+**EPIC-IMPLEMENT — DAG-scheduled, parallel-when-disjoint**
 
-- Strict sequential — story 1, then story 2, then story 3. Each developer agent run reads the prior story's code from disk.
-- Add to the developer agent prompt: `"You are story M in the EPIC-IMPLEMENT pass. Stories 1..M-1 have already implemented within this pass — their code is on disk. Extend their patterns; do not rebuild what they produced."`
-- `--complete-story-pass --story M` after each story. `--advance-pass` when complete. Dashboard update.
+Stories with declared `dependsOn:` metadata in their frontmatter run in parallel when their dependencies are COMPLETE. Stories without explicit metadata fall back to "depend on all numerically prior stories" — same as the legacy strict-sequential model.
+
+- Orchestrator iteration: call `--promote-runnable-stories`, launch every promoted story's developer agent in parallel (one Agent call per story in a single message), wait for all to return, run `--complete-story-pass --story M` per completed story, then loop back. When `--promote-runnable-stories` returns empty AND no story is IN_PROGRESS, the pass is done — call `--advance-pass`.
+- Each developer agent's prompt includes the implementation-targets contract (item 5 of the speed plan), the DAG-ordering note (parallel stories have disjoint file scopes — file conflict = a `dependsOn:` bug), and the on-disk-predecessor note (stories listed in your `dependsOn:` have already implemented).
+- File-conflict insurance: if two parallel developers touch the same file, the second commit will fail tests — fix is to add a missing dependency edge and re-run.
+- `dependsOn:` is declared in story frontmatter. Default (no field) = depend on all earlier stories — preserves legacy behaviour. Declaring `dependsOn: []` or `dependsOn: [N]` opts INTO parallelism.
 
 **EPIC-QA**
 
@@ -885,11 +888,23 @@ The single QA pass for the entire epic. One E2E run, one batched manual verifica
 1. **Per-story spec-compliance Call A** — for each story, run code-reviewer Call A (review-mode) to surface findings. Do not commit.
 2. **Epic-level E2E** — launch playwright-runner with `node .claude/scripts/run-e2e-verification.js --epic-mode --epic <N>`. Per-story fix cycles use the story-scoped form.
 3. **Batched manual verification** — read all stories' verification checklists, present as ONE consolidated checklist grouped by story, single `AskUserQuestion`.
-4. **Fix Cycle (per-story scoping inside epic-level QA)**:
-   - For each story with findings, launch developer agent scoped to that story. Re-run THAT story's Vitest + Playwright spec only.
-   - Track per-story fix-cycle count in `epicPass.fixCycles[M]`. 3-cycle cap per story. Halt and ask user on cap exceeded.
-   - **Cross-story regression gate**: after all flagged stories' fixes land, re-run the FULL EPIC's Vitest + Playwright + spec-compliance-watchdog. Any failure goes back into the fix cycle.
-   - Re-prompt manual verification ONLY for the stories that had findings.
+4. **Fix Cycle (two-phase: per-story fixes, then ONE regression gate per cycle)**:
+
+   The cycle has a hard boundary between per-story work and the cross-story regression gate. Developers run only their story's tests. The orchestrator alone runs the full-epic regression — and only ONCE per cycle, AFTER every flagged story's fix is green on its own scope.
+
+   **4a — Per-story fix phase.** For each story with findings, launch developer agent scoped to that story. The orchestrator's prompt MUST include this constraint verbatim: "Re-run ONLY `npm --prefix web test -- epic-N-story-M` and (if routable) `npx playwright test web/e2e/epic-N-story-M-*.spec.ts`. Do NOT re-run the full Vitest suite, the full Playwright suite, or any other story's tests. The orchestrator runs the full-epic regression ONCE after all flagged stories' fixes are green." This rule alone saves ~5 minutes per fix attempt — visible in Epic 1's fix cycle 2, which spent 253 tool calls and ~30 minutes largely because the developer kept re-running the full suite.
+
+   Track per-story fix-cycle count in `epicPass.fixCycles[M]`. 3-cycle cap per story. Halt and ask user on cap exceeded.
+
+   **4b — Cross-story regression gate (orchestrator-owned, runs ONCE).** After every flagged story has returned green on its scoped tests, the orchestrator runs the full-epic regression gate exactly one time per cycle:
+
+   - `npm --prefix web test` (full Vitest)
+   - `node .claude/scripts/run-e2e-verification.js --epic-mode --epic <N>` (full Playwright)
+   - `node .claude/scripts/check-spec-compliance.js --epic <N>` (structural drift; the LLM watchdog only fires if this returns discrepancies)
+
+   If 4b fails, identify the regressing story from the failure trace and route ONLY that story back into 4a as cycle attempt N+1. Unaffected stories stay green.
+
+   When 4b passes clean: re-prompt manual verification ONLY for the stories that originally had findings.
 5. **Epic-level spec-compliance Call B** — compare against `epicPass.passStartedAt` baseline (whole-epic diff). Any drift halts the commit.
 6. **Single commit (Call C)** — `feat(epic-<N>): <epic name>` covering all stories.
 7. **Per-story COMPLETE transitions** — after the commit, run `transition-phase.js --epic <N> --story <M> --to COMPLETE` for each story in order. The final transition auto-advances to the next epic's STORIES.

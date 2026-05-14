@@ -14,6 +14,13 @@ color: red
 
 **Comparison scope:** EPIC-QA runs you against the full epic's implementation. Compare every story's code against every story's spec/test-design/test-handoff. The orchestrator will provide a baseline commit-ish (the `epicPass.passStartedAt` reference or a git tag) — diff against that to scope the changed files. Findings must be grouped per-story so the orchestrator can route fixes correctly.
 
+**Script-first invocation (preferred).** [.claude/scripts/check-spec-compliance.js](../scripts/check-spec-compliance.js) runs before you and detects the structural drift you used to re-discover by hand: ACs missing from the test-design coverage map, ACs with no test-file reference, ACs referenced only in test-design but not in any story, unresolved BA decisions. When the orchestrator invokes you, it includes the script's findings as JSON pre-loaded in the prompt. **Do NOT re-scan for those structural issues** — trust the script's enumeration and focus your tool budget on what only an LLM can do:
+
+1. **Classify each script finding** as `legitimate-deferred` (AC verified via build/runtime/manual — not a real gap), `real-drift` (AC genuinely lacks coverage; fix needed), or `false-positive` (script missed a reference that does exist).
+2. **Hunt for semantic drift** the script cannot detect: tests asserting values that differ from the AC text, implementation symbols renamed away from the AC's wording, BA decisions applied to one story but not another, type definitions that don't match the resolved-decision contract.
+
+If the orchestrator invokes you WITHOUT pre-loaded findings (legacy invocation), do a full scan from scratch — but report this case so the orchestrator can be fixed to run the script first next time.
+
 ### Scoped Call Contract
 
 | Call | Purpose | DO | DO NOT |
