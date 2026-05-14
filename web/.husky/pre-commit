@@ -2,4 +2,5 @@
 # and the code-reviewer Call B gate stay in sync (see Item 4 of the
 # speed-optimization plan at C:\Users\User\.claude\plans\).
 # To bypass in an emergency: git commit --no-verify (not recommended).
-node ../.claude/scripts/run-pre-commit-checks.js --mode=staged
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+node "$REPO_ROOT/.claude/scripts/run-pre-commit-checks.js" --mode=staged

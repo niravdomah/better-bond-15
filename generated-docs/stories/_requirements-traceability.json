@@ -1,29 +1,13 @@
 {
-  "generated": "2026-05-12T11:35:10.216Z",
+  "generated": "2026-05-14T08:31:51.152Z",
   "featureName": "BetterBond Commission Payments POC",
-  "epicsScoped": 1,
+  "epicsScoped": 3,
   "totalEpics": 4,
   "coverage": {
     "functional": {
       "total": 27,
-      "covered": 4,
+      "covered": 20,
       "uncovered": [
-        "R1",
-        "R2",
-        "R3",
-        "R4",
-        "R5",
-        "R6",
-        "R7",
-        "R8",
-        "R9",
-        "R10",
-        "R11",
-        "R12",
-        "R13",
-        "R14",
-        "R15",
-        "R16",
         "R17",
         "R18",
         "R19",
@@ -35,26 +19,15 @@
     },
     "businessRules": {
       "total": 10,
-      "covered": 0,
+      "covered": 9,
       "uncovered": [
-        "BR1",
-        "BR2",
-        "BR3",
-        "BR4",
-        "BR5",
-        "BR6",
-        "BR7",
-        "BR8",
-        "BR9",
         "BR10"
       ]
     },
     "nonFunctional": {
       "total": 6,
-      "covered": 5,
-      "uncovered": [
-        "NFR6"
-      ]
+      "covered": 6,
+      "uncovered": []
     },
     "compliance": {
       "total": 0,
@@ -63,25 +36,9 @@
     },
     "overall": {
       "total": 43,
-      "covered": 9,
-      "percent": 21,
+      "covered": 35,
+      "percent": 81,
       "uncovered": [
-        "R1",
-        "R2",
-        "R3",
-        "R4",
-        "R5",
-        "R6",
-        "R7",
-        "R8",
-        "R9",
-        "R10",
-        "R11",
-        "R12",
-        "R13",
-        "R14",
-        "R15",
-        "R16",
         "R17",
         "R18",
         "R19",
@@ -89,83 +46,9 @@
         "R21",
         "R22",
         "R23",
-        "BR1",
-        "BR2",
-        "BR3",
-        "BR4",
-        "BR5",
-        "BR6",
-        "BR7",
-        "BR8",
-        "BR9",
-        "BR10",
-        "NFR6"
+        "BR10"
       ],
       "pending": [
-        {
-          "id": "R1",
-          "claimedByEpic": 2
-        },
-        {
-          "id": "R2",
-          "claimedByEpic": 2
-        },
-        {
-          "id": "R3",
-          "claimedByEpic": 2
-        },
-        {
-          "id": "R4",
-          "claimedByEpic": 2
-        },
-        {
-          "id": "R5",
-          "claimedByEpic": 2
-        },
-        {
-          "id": "R6",
-          "claimedByEpic": 2
-        },
-        {
-          "id": "R7",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "R8",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "R9",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "R10",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "R11",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "R12",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "R13",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "R14",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "R15",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "R16",
-          "claimedByEpic": 3
-        },
         {
           "id": "R17",
           "claimedByEpic": 4
@@ -195,48 +78,8 @@
           "claimedByEpic": 4
         },
         {
-          "id": "BR1",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "BR2",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "BR3",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "BR4",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "BR5",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "BR6",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "BR7",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "BR8",
-          "claimedByEpic": 3
-        },
-        {
-          "id": "BR9",
-          "claimedByEpic": 2
-        },
-        {
           "id": "BR10",
           "claimedByEpic": 4
-        },
-        {
-          "id": "NFR6",
-          "claimedByEpic": 2
         }
       ],
       "realGaps": []

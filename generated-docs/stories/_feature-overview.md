@@ -8,7 +8,7 @@ A web-based payment management interface for BetterBond payment administrators t
 
 1. **Epic 1: Foundation — Auth, Branding, Navigation, and API Setup** - Configure next-auth credentials provider, apply MortgageMax branding (navy #1A3A6E, teal accent, light mode), implement the top navigation bar with active-route highlighting, and wire the API client to the backend at `http://localhost:8042`. Replaces any template auth/demo code that conflicts with the FRS. | Status: In Progress | Dir: `epic-1-foundation/`
 2. **Epic 2: Dashboard** - Implement the Dashboard home page: fetch from `GET /v1/payments/dashboard`, render three metric cards (ready-to-pay count, payments-made count + total value last 14 days in R format, parked count), Payment Status Report grid, and Parked Payments Aging Report grid with a shared AgencyName client-side filter dropdown. Full loading, error, and empty states. | Status: Pending | Dir: `epic-2-dashboard/`
-3. **Epic 3: Payment Management** - Implement the Payment Management page: fetch from `GET /v1/payments`, render the paginated payment grid (20 rows/page) with AgencyName filter, per-row and header checkboxes, Park/Unpark bulk mutation buttons (disabled when nothing selected), and the Initiate Payments button (enabled only when an agency is selected and REG-status payments exist). Full post-mutation refresh, toast notifications for success and error, and empty state. | Status: Pending | Dir: `epic-3-payment-management/`
+3. **Epic 3: Payment Management** - Implement the Payment Management page: fetch from `GET /v1/payments`, render the paginated payment grid (20 rows/page) with AgencyName filter, per-row and header checkboxes, Park/Unpark bulk mutation buttons (disabled when nothing selected), and the Initiate Payments button (enabled only when an agency is selected and REG-status payments exist). Full post-mutation refresh, toast notifications for success and error, and empty state. | Status: In Progress | Dir: `epic-3-payment-management/`
 4. **Epic 4: Payments Made / Batch List** - Implement the Payments Made page: fetch from `GET /v1/payment-batches`, render the paginated batch list (20 rows/page) with per-row "Download PDF" button (`POST /v1/payment-batches/{Id}/download-invoice-pdf`), empty state, and Reset Demo Data button (`POST /demo/reset-demo`, no confirmation dialog). Full toast notifications for PDF download errors, reset success, and reset errors. | Status: Pending | Dir: `epic-4-payments-made/`
 
 ## Requirements Coverage
@@ -44,3 +44,11 @@ Epics 2, 3, and 4 can technically run in parallel after Epic 1 completes, but se
 | Story | Title | File | Status |
 |-------|-------|------|--------|
 | 2.1 | Dashboard Page with Metric Cards and Report Grids | `epic-2-dashboard/story-1-dashboard-page.md` | Pending |
+
+## Epic 3 Stories
+
+| Story | Title | File | Status |
+|-------|-------|------|--------|
+| 3.1 | Payment Management Grid with Filtering and Pagination | `epic-3-payment-management/story-1-payment-grid-filter-pagination.md` | Pending |
+| 3.2 | Row Selection, Park/Unpark Bulk Actions, and Post-Mutation Refresh | `epic-3-payment-management/story-2-row-selection-park-unpark.md` | Pending |
+| 3.3 | Initiate Payments Button and Batch Creation | `epic-3-payment-management/story-3-initiate-payments.md` | Pending |
